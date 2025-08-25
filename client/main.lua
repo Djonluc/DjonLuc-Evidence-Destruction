@@ -1236,7 +1236,8 @@ function StartConvoyMovement(evidenceVehicle, route)
 end
 
 -- Vehicle Trunk Loot System (replaces loot crate)
-local vehicleTrunkItems = {} -- Track items in vehicle trunk
+-- Track items in vehicle trunk (accessible to all functions)
+vehicleTrunkItems = {}
 local droppedItems = {} -- Track dropped items in the world
 
 -- FiveM Native Trunk Management Functions
@@ -1384,7 +1385,7 @@ local function FillStockadeTrunkWithLoot(vehicle)
 end
 
 -- Add items to vehicle trunk
-RegisterNetEvent('djonluc_evidence_event:addItemToVehicleTrunk')
+RegisterNetEvent('djonluc_evidence_event:addItemToTrunk')
 AddEventHandler('djonluc_evidence_event:addItemToTrunk', function(vehicleNetId, itemName, count)
     DebugPrint("Adding items to vehicle trunk:", itemName, "x", count, "Vehicle:", vehicleNetId)
     

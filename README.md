@@ -68,8 +68,16 @@ The script automatically detects and uses available dependencies:
 
 #### **Required:**
 
-- **Framework**: QBCore, ESX, QBox, or vRP
+- **Framework**: QBCore, ESX, QBox, vRP, or Standalone
 - **FiveM Server** (Latest version recommended)
+
+#### **Framework Compatibility:**
+
+- **QBCore v1/v2** - Full feature support
+- **ESX Legacy/Legacy+** - Complete integration
+- **vRP/vRP2** - Full permission system
+- **Standalone** - Basic functionality without framework
+- **Custom Frameworks** - Auto-detection with fallbacks
 
 #### **Optional (Enhanced Features):**
 
@@ -79,6 +87,9 @@ The script automatically detects and uses available dependencies:
 - **qb_inventory** - Inventory integration
 - **ox_inventory** - Alternative inventory system
 - **ox_weapons** - Weapon system integration
+- **esx_menu_default** - ESX menu system
+- **esx_identity** - ESX identity management
+- **vrp_basic_menu** - vRP menu system
 
 ### 3. **Server Configuration**
 
@@ -138,12 +149,60 @@ Config.StartJobs = {
 
 ### **Framework Detection**
 
-The script automatically detects and adapts to:
+The script automatically detects and adapts to multiple frameworks:
 
-- **QBCore** (Latest versions)
-- **ESX** (Legacy and Legacy+)
-- **QBox** (QBCore variant)
-- **vRP** (Legacy framework)
+#### **Primary Frameworks:**
+
+- **QBCore** - Full support with latest versions (v2.0+)
+- **ESX** - Legacy and Legacy+ compatibility
+- **QBox** - QBCore-based framework support
+- **vRP** - Legacy framework support
+
+#### **Extended Framework Support:**
+
+- **Standalone** - No framework required (basic functionality)
+- **QBCore v1** - Legacy QBCore versions
+- **ESX Legacy** - Older ESX versions
+- **vRP2** - Modern vRP implementations
+- **Custom Frameworks** - Auto-detection and fallback support
+
+#### **Framework Migration Support:**
+
+- **QBCore v1 → v2** - Seamless upgrade path
+- **ESX Legacy → Legacy+** - Backward compatibility
+- **vRP → vRP2** - Migration assistance
+- **Framework Switching** - Easy configuration changes
+
+### **Framework-Specific Features**
+
+#### **QBCore Integration:**
+
+- **Job System** - Full job permission integration
+- **Inventory System** - qb-inventory and ox_inventory support
+- **Menu System** - qb-menu integration
+- **Target System** - qb-target support
+- **Notification System** - QBCore notifications
+
+#### **ESX Integration:**
+
+- **Job Management** - ESX job system integration
+- **Inventory Support** - ESX inventory compatibility
+- **Menu Systems** - ESX menu integration
+- **Notification Support** - ESX notification system
+
+#### **vRP Integration:**
+
+- **Group Permissions** - vRP group system
+- **Inventory Management** - vRP inventory support
+- **Menu Integration** - vRP menu systems
+- **Permission System** - vRP permission handling
+
+#### **Standalone Mode:**
+
+- **Basic Functionality** - Core features without framework
+- **Permission System** - Config-based permissions
+- **Inventory Integration** - Manual inventory handling
+- **Menu Systems** - Fallback menu options
 
 ### **Optional Dependencies**
 
@@ -151,6 +210,11 @@ The script automatically detects and adapts to:
 - **qb-target** - Entity targeting
 - **qb-menu** - Menu system
 - **qb_inventory** - Inventory management
+- **ox_inventory** - Alternative inventory system
+- **ox_weapons** - Weapon system integration
+- **esx_menu_default** - ESX default menu system
+- **esx_identity** - ESX identity management
+- **vrp_basic_menu** - vRP basic menu system
 
 ## 🚀 Future Plans
 
@@ -208,6 +272,32 @@ Join our community for support, updates, and discussions:
 2. **Verify Dependencies** - Ensure required resources are started
 3. **Check Permissions** - Verify job permissions in config
 4. **Review Console Logs** - Look for error messages
+
+### **Framework-Specific Troubleshooting**
+
+#### **QBCore Issues:**
+
+- **Version Detection** - Ensure QBCore is properly started
+- **Job System** - Verify job permissions in QBCore
+- **Inventory Integration** - Check qb-inventory/ox_inventory status
+
+#### **ESX Issues:**
+
+- **ESX Version** - Confirm ESX version (Legacy vs Legacy+)
+- **Job Management** - Verify ESX job system integration
+- **Menu Systems** - Check esx_menu_default availability
+
+#### **vRP Issues:**
+
+- **Group Permissions** - Verify vRP group system
+- **Permission Levels** - Check vRP permission configuration
+- **Menu Integration** - Ensure vrp_basic_menu is available
+
+#### **Standalone Mode:**
+
+- **No Framework** - Script works without any framework
+- **Config Permissions** - Use config-based permission system
+- **Basic Features** - Limited functionality without framework integration
 
 ## 👨‍💻 Author
 
