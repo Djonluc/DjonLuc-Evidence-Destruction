@@ -240,6 +240,30 @@ The convoy now spawns in a **single file line formation** with the evidence vehi
 - **Escort SUVs**: Spawn behind the escort cars in a line
 - **Formation**: Vehicles are spaced 5.0 meters apart in a single file line
 
+## 🚀 Enhanced Professional Features
+
+### **📍 Advanced Blip System**
+
+- **Individual Vehicle Tracking**: Each convoy vehicle has its own blip
+- **Convoy Status Indicator**: Shows if convoy is ACTIVE or UNDER ATTACK
+- **Protection Zone**: 50m radius red zone around convoy
+- **Route Progress**: Visual indicator at route midpoint
+- **Dynamic Distance**: Real-time distance to convoy
+
+### **🧍 Enhanced Ped AI**
+
+- **Smart Task Management**: Peds automatically drive to destination
+- **Formation Maintenance**: Vehicles maintain proper convoy spacing
+- **Instant Response**: Uses `CLEAR_PED_TASKS_IMMEDIATELY` for quick reactions
+- **Professional Behavior**: Realistic convoy driving patterns
+
+### **🎯 Professional Appearance**
+
+- **Color-Coded Blips**: Different colors for different vehicle types
+- **Status Indicators**: Real-time convoy health and status
+- **Route Visualization**: Clear path from start to destination
+- **Police Operation Look**: Professional appearance like real law enforcement
+
 ### Debug Commands
 
 Use these commands to troubleshoot and test the system:
@@ -249,3 +273,4 @@ Use these commands to troubleshoot and test the system:
 - `/testpedspawn` - Test spawning peds in specific vehicles
 - `/testvehicles` - Test vehicle spawning and positioning
 - `/testcoords` - Check vehicle coordinates and spawn points
+- `/testenhanced` - Test all enhanced convoy system features

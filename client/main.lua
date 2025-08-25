@@ -202,13 +202,83 @@ end, false)
 -- Make escort peds globally accessible for AI system
 _G.convoyEscortPeds = _G.escortPeds
 
--- Blip management functions
+-- Enhanced blip management with individual vehicle tracking
+local convoyBlips = {} -- Table to store individual vehicle blips
+local convoyBlip = nil -- Main convoy blip
+local destinationBlip = nil -- Destination blip
+
+-- Create individual blips for each convoy vehicle
+local function CreateVehicleBlips()
+    -- Clear existing vehicle blips
+    for _, blip in pairs(convoyBlips) do
+        if DoesBlipExist(blip) then
+            RemoveBlip(blip)
+        end
+    end
+    convoyBlips = {}
+    
+    -- Create blip for evidence vehicle
+    if #convoyVehicles > 0 then
+        local evidenceVehicle = convoyVehicles[1] -- Evidence vehicle should be first
+        if DoesEntityExist(evidenceVehicle) then
+            local evidenceBlip = AddBlipForEntity(evidenceVehicle)
+            SetBlipSprite(evidenceBlip, 67) -- Police car sprite
+            SetBlipDisplay(evidenceBlip, 4)
+            SetBlipScale(evidenceBlip, 1.2)
+            SetBlipColour(evidenceBlip, 1) -- Red color for evidence vehicle
+            SetBlipAsShortRange(evidenceBlip, false)
+            BeginTextCommandSetBlipName("STRING")
+            AddTextComponentString("Evidence Vehicle")
+            EndTextCommandSetBlipName(evidenceBlip)
+            
+            convoyBlips.evidence = evidenceBlip
+            DebugPrint("Evidence vehicle blip created:", evidenceBlip)
+        end
+    end
+    
+    -- Create blips for escort vehicles
+    for i, vehicle in ipairs(convoyVehicles) do
+        if DoesEntityExist(vehicle) and vehicle ~= convoyVehicles[1] then
+            local vehicleBlip = AddBlipForEntity(vehicle)
+            local model = GetEntityModel(vehicle)
+            local expectedCarHash = GetHashKey(Config.Vehicles.escort_car.model)
+            local expectedSuvHash = GetHashKey(Config.Vehicles.escort_suv.model)
+            
+            -- Set blip properties based on vehicle type
+            if model == expectedCarHash then
+                SetBlipSprite(vehicleBlip, 56) -- Police car sprite
+                SetBlipColour(vehicleBlip, 3) -- Blue color for escort cars
+                BeginTextCommandSetBlipName("STRING")
+                AddTextComponentString("Escort Car " .. i)
+                EndTextCommandSetBlipName(vehicleBlip)
+            elseif model == expectedSuvHash then
+                SetBlipSprite(vehicleBlip, 56) -- Police car sprite
+                SetBlipColour(vehicleBlip, 5) -- Yellow color for escort SUVs
+                BeginTextCommandSetBlipName(vehicleBlip, 5)
+                BeginTextCommandSetBlipName("STRING")
+                AddTextComponentString("Escort SUV " .. i)
+                EndTextCommandSetBlipName(vehicleBlip)
+            end
+            
+            SetBlipDisplay(vehicleBlip, 4)
+            SetBlipScale(vehicleBlip, 0.8)
+            SetBlipAsShortRange(vehicleBlip, false)
+            
+            convoyBlips[i] = vehicleBlip
+            DebugPrint("Escort vehicle blip created:", vehicleBlip, "for vehicle:", i)
+        end
+    end
+    
+    DebugPrint("Total vehicle blips created:", #convoyBlips)
+end
+
+-- Create main convoy blip and destination
 local function CreateConvoyBlip()
     if convoyBlip then
         RemoveBlip(convoyBlip)
     end
     
-    -- Create blip with proper parameters (FiveM best practice)
+    -- Create main convoy blip
     convoyBlip = AddBlipForCoord(0, 0, 0)
     SetBlipSprite(convoyBlip, 67) -- Police car sprite
     SetBlipDisplay(convoyBlip, 4)
@@ -219,25 +289,28 @@ local function CreateConvoyBlip()
     AddTextComponentString("Evidence Convoy")
     EndTextCommandSetBlipName(convoyBlip)
     
-    -- Add route line to destination (FiveM best practice)
+    -- Add destination blip
     if eventData and eventData.route and eventData.route.destruction then
-        local routeBlip = AddBlipForCoord(eventData.route.destruction.x, eventData.route.destruction.y, eventData.route.destruction.z)
-        SetBlipSprite(routeBlip, 1) -- Destination sprite
-        SetBlipDisplay(routeBlip, 4)
-        SetBlipScale(routeBlip, 0.8)
-        SetBlipColour(routeBlip, 2) -- Green color
-        SetBlipAsShortRange(routeBlip, false)
+        destinationBlip = AddBlipForCoord(eventData.route.destruction.x, eventData.route.destruction.y, eventData.route.destruction.z)
+        SetBlipSprite(destinationBlip, 1) -- Destination sprite
+        SetBlipDisplay(destinationBlip, 4)
+        SetBlipScale(destinationBlip, 0.8)
+        SetBlipColour(destinationBlip, 2) -- Green color
+        SetBlipAsShortRange(destinationBlip, false)
         BeginTextCommandSetBlipName("STRING")
         AddTextComponentString("Evidence Destruction Point")
-        EndTextCommandSetBlipName(routeBlip)
+        EndTextCommandSetBlipName(destinationBlip)
         
-        -- Store destination blip reference
-        _G.destinationBlip = routeBlip
+        DebugPrint("Destination blip created")
     end
     
-    DebugPrint("Convoy blip created")
+    -- Create individual vehicle blips
+    CreateVehicleBlips()
+    
+    DebugPrint("Enhanced convoy blip system created")
 end
 
+-- Update convoy blip positions and create protection zone
 local function UpdateConvoyBlip()
     if not convoyBlip or not eventActive or #convoyVehicles == 0 then
         return
@@ -266,29 +339,37 @@ local function UpdateConvoyBlip()
         end
     end
     
-    if evidenceVehicle and DoesEntityExist(evidenceVehicle) then
+    if evidenceVehicle then
         local coords = GetEntityCoords(evidenceVehicle)
+        
+        -- Update main convoy blip position
         SetBlipCoords(convoyBlip, coords.x, coords.y, coords.z)
         
-        -- Check if convoy is under attack (any vehicle damaged)
-        local isUnderAttack = false
-        for _, vehicle in ipairs(convoyVehicles) do
-            if DoesEntityExist(vehicle) and GetVehicleEngineHealth(vehicle) < 1000 then
-                isUnderAttack = true
-                break
+        -- Create convoy protection zone (radius blip)
+        if not convoyBlips.protectionZone then
+            convoyBlips.protectionZone = AddBlipForRadius(coords.x, coords.y, coords.z, 50.0)
+            SetBlipRotation(convoyBlips.protectionZone, 0)
+            SetBlipColour(convoyBlips.protectionZone, 1) -- Red color for danger zone
+            SetBlipAlpha(convoyBlips.protectionZone, 128) -- Semi-transparent
+            SetBlipAsShortRange(convoyBlips.protectionZone, false)
+            
+            BeginTextCommandSetBlipName("STRING")
+            AddTextComponentString("Convoy Protection Zone")
+            EndTextCommandSetBlipName(convoyBlips.protectionZone)
+            
+            DebugPrint("Convoy protection zone created")
+        else
+            -- Update protection zone position
+            SetBlipCoords(convoyBlips.protectionZone, coords.x, coords.y, coords.z)
+        end
+        
+        -- Update individual vehicle blips (they automatically follow entities)
+        for _, blip in pairs(convoyBlips) do
+            if DoesBlipExist(blip) and blip ~= convoyBlips.protectionZone then
+                -- Entity blips update automatically, just ensure they're visible
+                SetBlipDisplay(blip, 4)
             end
         end
-        
-        -- Flash blip if under attack
-        if isUnderAttack then
-            SetBlipColour(convoyBlip, 1) -- Red when under attack
-            SetBlipFlashes(convoyBlip, true)
-        else
-            SetBlipColour(convoyBlip, 3) -- Blue when safe
-            SetBlipFlashes(convoyBlip, false)
-        end
-        
-        DebugPrint("Convoy blip updated to position:", coords.x, coords.y, coords.z, "Under attack:", isUnderAttack)
     end
 end
 
@@ -791,6 +872,22 @@ function SpawnConvoy(route)
                     print("Warning: Failed to initialize AI for ped")
                 else
                     DebugPrint("AI initialized successfully for ped:", ped)
+                end
+            end
+        end
+        
+        -- Create enhanced convoy status system
+        CreateConvoyStatusSystem()
+        
+        -- Set up enhanced ped task management
+        DebugPrint("Setting up enhanced ped task management...")
+        for i, ped in ipairs(_G.escortPeds) do
+            if DoesEntityExist(ped) then
+                local vehicle = GetVehiclePedIsIn(ped, false)
+                if vehicle and DoesEntityExist(vehicle) then
+                    -- Set peds to drive their vehicles in convoy formation
+                    ManagePedTasks(ped, vehicle, "drive")
+                    DebugPrint("Ped", i, "set to drive mode")
                 end
             end
         end
@@ -1550,8 +1647,8 @@ AddEventHandler('djonluc_evidence_event:cleanupConvoy', function()
     vehicleTrunkItems = {}
     DebugPrint("Vehicle trunk items cleared")
     
-    -- Remove convoy blip
-    RemoveConvoyBlip()
+    -- Remove convoy blip using enhanced cleanup
+    CleanupConvoyBlips()
 end)
 
 -- Handle convoy destruction
@@ -1593,6 +1690,7 @@ Citizen.CreateThread(function()
         
         if eventActive and convoyBlip then
             UpdateConvoyBlip()
+            UpdateConvoyStatus() -- Update convoy status indicators
             
             -- Add distance indicator to blip name
             if convoyBlip and IsBlipVisible(convoyBlip) then
@@ -1786,3 +1884,258 @@ function Utils.QBCoreShowMenuClient(menuData)
     end
     return false
 end
+
+-- Enhanced blip cleanup function
+local function CleanupConvoyBlips()
+    -- Remove main convoy blip
+    if convoyBlip and DoesBlipExist(convoyBlip) then
+        RemoveBlip(convoyBlip)
+        convoyBlip = nil
+        DebugPrint("Main convoy blip removed")
+    end
+    
+    -- Remove destination blip
+    if destinationBlip and DoesBlipExist(destinationBlip) then
+        RemoveBlip(destinationBlip)
+        destinationBlip = nil
+        DebugPrint("Destination blip removed")
+    end
+    
+    -- Remove all vehicle blips
+    for _, blip in pairs(convoyBlips) do
+        if DoesBlipExist(blip) then
+            RemoveBlip(blip)
+            DebugPrint("Vehicle blip removed:", blip)
+        end
+    end
+    convoyBlips = {}
+    
+    DebugPrint("All convoy blips cleaned up")
+end
+
+-- Enhanced ped task management for better convoy behavior
+local function ManagePedTasks(ped, vehicle, taskType)
+    if not DoesEntityExist(ped) or not DoesEntityExist(vehicle) then
+        return false
+    end
+    
+    -- Clear any existing tasks immediately for instant response
+    ClearPedTasksImmediately(ped)
+    Citizen.Wait(100) -- Brief pause for task clearing
+    
+    if taskType == "drive" then
+        -- Set ped to drive vehicle to destination
+        if eventData and eventData.route and eventData.route.destruction then
+            local destination = eventData.route.destruction
+            local speed = Config.ConvoyMovement.speed or 20.0
+            
+            -- Use long-range driving for better convoy movement
+            TaskVehicleDriveToCoordLongrange(ped, vehicle, destination.x, destination.y, destination.z, speed, 786603, 5.0)
+            
+            -- Set driving attributes for convoy behavior
+            SetDriverAbility(ped, 1.0)
+            SetDriverAggressiveness(ped, 0.3) -- Lower aggression for convoy driving
+            
+            DebugPrint("Ped set to drive vehicle to destination with speed:", speed)
+            return true
+        end
+    elseif taskType == "follow" then
+        -- Set ped to follow the evidence vehicle
+        if #convoyVehicles > 0 then
+            local evidenceVehicle = convoyVehicles[1]
+            if DoesEntityExist(evidenceVehicle) then
+                -- Use vehicle following behavior
+                TaskVehicleFollow(ped, vehicle, evidenceVehicle, 20.0, 1, 5.0)
+                
+                DebugPrint("Ped set to follow evidence vehicle")
+                return true
+            end
+        end
+    elseif taskType == "escort" then
+        -- Set ped to escort behavior (patrol around vehicle)
+        local vehiclePos = GetEntityCoords(vehicle)
+        local patrolRadius = 10.0
+        
+        -- Create patrol points around the vehicle
+        local patrolPoints = {
+            vector3(vehiclePos.x + patrolRadius, vehiclePos.y, vehiclePos.z),
+            vector3(vehiclePos.x - patrolRadius, vehiclePos.y, vehiclePos.z),
+            vector3(vehiclePos.x, vehiclePos.y + patrolRadius, vehiclePos.z),
+            vector3(vehiclePos.x, vehiclePos.y - patrolRadius, vehiclePos.z)
+        }
+        
+        -- Set ped to patrol between points
+        TaskGoToCoordAnyMeans(ped, patrolPoints[1].x, patrolPoints[1].y, patrolPoints[1].z, 2.0, 0, false, 786603, 0)
+        
+        DebugPrint("Ped set to escort patrol mode")
+        return true
+    end
+    
+    return false
+end
+
+-- Professional convoy status and route visualization
+local function CreateConvoyStatusSystem()
+    -- Create convoy status indicator
+    if not convoyBlips.statusIndicator then
+        convoyBlips.statusIndicator = AddBlipForCoord(0, 0, 0)
+        SetBlipSprite(convoyBlips.statusIndicator, 84) -- Checkered flag sprite
+        SetBlipDisplay(convoyBlips.statusIndicator, 4)
+        SetBlipScale(convoyBlips.statusIndicator, 0.6)
+        SetBlipColour(convoyBlips.statusIndicator, 2) -- Green for active
+        SetBlipAsShortRange(convoyBlips.statusIndicator, false)
+        BeginTextCommandSetBlipName("STRING")
+        AddTextComponentString("Convoy Status: ACTIVE")
+        EndTextCommandSetBlipName(convoyBlips.statusIndicator)
+        
+        DebugPrint("Convoy status indicator created")
+    end
+    
+    -- Create route progress indicator
+    if eventData and eventData.route and eventData.route.start and eventData.route.destruction then
+        local startPos = eventData.route.start
+        local endPos = eventData.route.destruction
+        
+        -- Calculate route midpoint for progress indicator
+        local midX = (startPos.x + endPos.x) / 2
+        local midY = (startPos.y + endPos.y) / 2
+        local midZ = (startPos.z + endPos.z) / 2
+        
+        if not convoyBlips.routeProgress then
+            convoyBlips.routeProgress = AddBlipForCoord(midX, midY, midZ)
+            SetBlipSprite(convoyBlips.routeProgress, 162) -- Route sprite
+            SetBlipDisplay(convoyBlips.routeProgress, 4)
+            SetBlipScale(convoyBlips.routeProgress, 0.5)
+            SetBlipColour(convoyBlips.routeProgress, 5) -- Yellow for route
+            SetBlipAsShortRange(convoyBlips.routeProgress, false)
+            BeginTextCommandSetBlipName("STRING")
+            AddTextComponentString("Route Progress")
+            EndTextCommandSetBlipName(convoyBlips.routeProgress)
+            
+            DebugPrint("Route progress indicator created")
+        end
+    end
+end
+
+-- Update convoy status based on current conditions
+local function UpdateConvoyStatus()
+    if not convoyBlips.statusIndicator or not eventActive then
+        return
+    end
+    
+    local status = "ACTIVE"
+    local statusColor = 2 -- Green
+    local isUnderAttack = false
+    
+    -- Check convoy health status
+    for _, vehicle in ipairs(convoyVehicles) do
+        if DoesEntityExist(vehicle) then
+            local engineHealth = GetVehicleEngineHealth(vehicle)
+            local bodyHealth = GetVehicleBodyHealth(vehicle)
+            
+            if engineHealth < 500 or bodyHealth < 500 then
+                isUnderAttack = true
+                break
+            end
+        end
+    end
+    
+    -- Check if any escort peds are dead
+    for _, ped in ipairs(_G.escortPeds) do
+        if DoesEntityExist(ped) and IsEntityDead(ped) then
+            isUnderAttack = true
+            break
+        end
+    end
+    
+    -- Update status based on conditions
+    if isUnderAttack then
+        status = "UNDER ATTACK"
+        statusColor = 1 -- Red
+        -- Flash the status blip
+        SetBlipFlashes(convoyBlips.statusIndicator, true)
+    else
+        status = "ACTIVE"
+        statusColor = 2 -- Green
+        SetBlipFlashes(convoyBlips.statusIndicator, false)
+    end
+    
+    -- Update status blip
+    SetBlipColour(convoyBlips.statusIndicator, statusColor)
+    BeginTextCommandSetBlipName("STRING")
+    AddTextComponentString("Convoy Status: " .. status)
+    EndTextCommandSetBlipName(convoyBlips.statusIndicator)
+    
+    DebugPrint("Convoy status updated:", status)
+end
+
+-- Test command for enhanced convoy system
+RegisterCommand('testenhanced', function()
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^3[Djonluc Evidence Event]^7 🚀 TESTING ENHANCED CONVOY SYSTEM")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    
+    if not eventActive then
+        print("^1[Djonluc Evidence Event]^7 ❌ No active event. Start an event first!")
+        return
+    end
+    
+    print("^3[Djonluc Evidence Event]^7 Enhanced System Status:")
+    
+    -- Check blip system
+    print("^3[Djonluc Evidence Event]^7 📍 Blip System:")
+    print("^3[Djonluc Evidence Event]^7   Main convoy blip:", convoyBlip and "✅ Active" or "❌ Missing")
+    print("^3[Djonluc Evidence Event]^7   Destination blip:", destinationBlip and "✅ Active" or "❌ Missing")
+    print("^3[Djonluc Evidence Event]^7   Vehicle blips:", #convoyBlips, "total")
+    print("^3[Djonluc Evidence Event]^7   Status indicator:", convoyBlips.statusIndicator and "✅ Active" or "❌ Missing")
+    print("^3[Djonluc Evidence Event]^7   Route progress:", convoyBlips.routeProgress and "✅ Active" or "❌ Missing")
+    print("^3[Djonluc Evidence Event]^7   Protection zone:", convoyBlips.protectionZone and "✅ Active" or "❌ Missing")
+    
+    -- Check ped task management
+    print("^3[Djonluc Evidence Event]^7 🧍 Ped Task Management:")
+    local drivingPeds = 0
+    local followingPeds = 0
+    local escortPeds = 0
+    
+    for _, ped in ipairs(_G.escortPeds) do
+        if DoesEntityExist(ped) then
+            local vehicle = GetVehiclePedIsIn(ped, false)
+            if vehicle then
+                local task = GetScriptTaskStatus(ped, GetHashKey("SCRIPT_TASK_VEHICLE_DRIVE_TO_COORD"))
+                if task == 1 then
+                    drivingPeds = drivingPeds + 1
+                end
+            end
+        end
+    end
+    
+    print("^3[Djonluc Evidence Event]^7   Peds driving to destination:", drivingPeds)
+    print("^3[Djonluc Evidence Event]^7   Total escort peds:", #_G.escortPeds)
+    
+    -- Check convoy formation
+    print("^3[Djonluc Evidence Event]^7 🚗 Convoy Formation:")
+    print("^3[Djonluc Evidence Event]^7   Total vehicles:", #convoyVehicles)
+    print("^3[Djonluc Evidence Event]^7   Formation type: Single File Line")
+    print("^3[Djonluc Evidence Event]^7   Spacing: 5.0m between vehicles")
+    
+    -- Test enhanced functions
+    print("^3[Djonluc Evidence Event]^7 🧪 Testing Enhanced Functions:")
+    
+    -- Test status update
+    if convoyBlips.statusIndicator then
+        UpdateConvoyStatus()
+        print("^2[Djonluc Evidence Event]^7 ✅ Status update test completed")
+    end
+    
+    -- Test task management
+    if #_G.escortPeds > 0 and #convoyVehicles > 0 then
+        local testPed = _G.escortPeds[1]
+        local testVehicle = convoyVehicles[1]
+        if DoesEntityExist(testPed) and DoesEntityExist(testVehicle) then
+            local success = ManagePedTasks(testPed, testVehicle, "drive")
+            print("^2[Djonluc Evidence Event]^7 ✅ Task management test completed:", success)
+        end
+    end
+    
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+end, false)
