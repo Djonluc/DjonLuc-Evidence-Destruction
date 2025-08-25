@@ -289,6 +289,34 @@ Config.ConvoyMovement = {
 }
 ```
 
+## 🚗 Enhanced Convoy System
+
+### Convoy Formation
+
+The convoy now spawns in a proper line formation with the evidence vehicle in the center:
+
+- **Evidence Vehicle**: Spawns at the center point (spawn coordinates)
+- **Escort Cars**: Spawn to the RIGHT of center with 5.0m spacing
+- **Escort SUVs**: Spawn to the LEFT of center with 5.0m spacing
+- **Formation**: Vehicles maintain optimal spacing for convoy movement
+
+### Debug Commands
+
+Use these commands to troubleshoot and test the system:
+
+- `/debugspawn` - Comprehensive check of all convoy vehicles and escort peds
+- `/testformation` - Analyze convoy formation and vehicle positions
+- `/testpedspawn` - Test spawning peds in specific vehicles
+- `/testvehicles` - Test vehicle spawning and positioning
+- `/testcoords` - Check vehicle coordinates and spawn points
+
+### Vehicle Assignment
+
+Peds are automatically assigned to the correct vehicle types:
+
+- **Escort Cops** → Escort Cars (driver seat)
+- **Escort SWAT** → Escort SUVs (driver seat)
+
 ## 🐛 Troubleshooting
 
 ### Common Issues

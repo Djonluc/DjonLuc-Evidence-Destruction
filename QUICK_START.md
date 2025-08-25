@@ -230,3 +230,22 @@ start = vector4(-1037.89, -2738.56, 20.17, 327.0)
 ---
 
 **🎯 Ready to start? Use `/preset police` and then `/startevidence`!**
+
+## 🚗 Convoy Formation System
+
+The convoy now spawns in a proper line formation with the evidence vehicle in the center:
+
+- **Evidence Vehicle**: Spawns at the center point (your spawn coordinates)
+- **Escort Cars**: Spawn to the RIGHT of center
+- **Escort SUVs**: Spawn to the LEFT of center
+- **Formation**: Vehicles are spaced 5.0 meters apart for optimal convoy movement
+
+### Debug Commands
+
+Use these commands to troubleshoot and test the system:
+
+- `/debugspawn` - Check all convoy vehicles and escort peds
+- `/testformation` - Analyze convoy formation and vehicle positions
+- `/testpedspawn` - Test spawning peds in specific vehicles
+- `/testvehicles` - Test vehicle spawning and positioning
+- `/testcoords` - Check vehicle coordinates and spawn points
