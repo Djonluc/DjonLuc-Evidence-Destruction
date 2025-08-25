@@ -181,6 +181,15 @@ Config.EvidenceItems = {
 -- Vehicle Trunk Loot System (replaces loot crate)
 Config.VehicleTrunkLoot = {
     enabled = true,
+    -- Item models for visual representation in trunk
+    item_models = {
+        weapon_pistol = "prop_cs_box_clothes",
+        cocaine_brick = "prop_drug_package",
+        cash = "prop_cash_pile_01",
+        meth = "prop_drug_package",
+        weed_brick = "prop_weed_bottle",
+        gold_bar = "prop_gold_bar"
+    },
     -- Items that spawn in evidence vehicle trunk when event starts
     trunk_items = {
         weapon_pistol = { count = 5, weight = 1.0 },

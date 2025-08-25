@@ -1239,11 +1239,161 @@ end
 local vehicleTrunkItems = {} -- Track items in vehicle trunk
 local droppedItems = {} -- Track dropped items in the world
 
+-- FiveM Native Trunk Management Functions
+local function OpenVehicleTrunk(vehicle)
+    if not DoesEntityExist(vehicle) then return false end
+    
+    -- Open trunk door (door index 5 = trunk)
+    SetVehicleDoorOpen(vehicle, 5, false, false)
+    DebugPrint("Trunk door opened for vehicle:", vehicle)
+    return true
+end
+
+local function CloseVehicleTrunk(vehicle)
+    if not DoesEntityExist(vehicle) then return false end
+    
+    -- Close trunk door
+    SetVehicleDoorShut(vehicle, 5, false)
+    DebugPrint("Trunk door closed for vehicle:", vehicle)
+    return true
+end
+
+local function GetTrunkPosition(vehicle)
+    if not DoesEntityExist(vehicle) then return nil end
+    
+    -- Get trunk position using offset from vehicle center
+    local vehicleCoords = GetEntityCoords(vehicle)
+    local vehicleHeading = GetEntityHeading(vehicle)
+    
+    -- Calculate trunk position (behind and below vehicle center)
+    local trunkOffset = vector3(0.0, -3.0, -0.5) -- Adjust based on stockade dimensions
+    local trunkPos = GetOffsetFromEntityInWorldCoords(vehicle, trunkOffset.x, trunkOffset.y, trunkOffset.z)
+    
+    DebugPrint("Trunk position calculated:", trunkPos.x, trunkPos.y, trunkPos.z)
+    return trunkPos
+end
+
+local function SpawnLootItemInTrunk(itemName, count, trunkPosition)
+    -- Get item model from config or use default
+    local itemModel = Config.VehicleTrunkLoot.item_models and Config.VehicleTrunkLoot.item_models[itemName] or "prop_cash_pile_01"
+    local itemHash = GetHashKey(itemModel)
+    
+    -- Request and load model
+    RequestModel(itemHash)
+    local modelLoadStart = GetGameTimer()
+    while not HasModelLoaded(itemHash) and (GetGameTimer() - modelLoadStart) < 5000 do
+        Citizen.Wait(0)
+    end
+    
+    if not HasModelLoaded(itemHash) then
+        DebugPrint("Failed to load item model:", itemModel)
+        SetModelAsNoLongerNeeded(itemHash)
+        return nil
+    end
+    
+    -- Create item object at trunk position
+    local itemObject = CreateObject(itemHash, trunkPosition.x, trunkPosition.y, trunkPosition.z, true, true, true)
+    
+    if DoesEntityExist(itemObject) then
+        -- Make item persistent
+        SetEntityAsMissionEntity(itemObject, true, true)
+        
+        -- Set item properties
+        SetEntityCollision(itemObject, false, false)
+        SetEntityInvincible(itemObject, true)
+        
+        -- Randomize position slightly within trunk area
+        local randomOffset = vector3(
+            math.random(-0.3, 0.3),
+            math.random(-0.3, 0.3),
+            math.random(0.0, 0.2)
+        )
+        
+        local finalPos = vector3(
+            trunkPosition.x + randomOffset.x,
+            trunkPosition.y + randomOffset.y,
+            trunkPosition.z + randomOffset.z
+        )
+        
+        SetEntityCoords(itemObject, finalPos.x, finalPos.y, finalPos.z, false, false, false, true)
+        
+        DebugPrint("Loot item spawned in trunk:", itemName, "at position:", finalPos.x, finalPos.y, finalPos.z)
+        
+        -- Clean up model
+        SetModelAsNoLongerNeeded(itemHash)
+        
+        return itemObject
+    else
+        DebugPrint("Failed to create loot item object:", itemName)
+        SetModelAsNoLongerNeeded(itemHash)
+        return nil
+    end
+end
+
+local function FillStockadeTrunkWithLoot(vehicle)
+    if not DoesEntityExist(vehicle) then return false end
+    
+    -- Check if this is the stockade (evidence vehicle)
+    local model = GetEntityModel(vehicle)
+    if model ~= GetHashKey("stockade") then
+        DebugPrint("Vehicle is not stockade, skipping trunk fill")
+        return false
+    end
+    
+    DebugPrint("Filling stockade trunk with loot...")
+    
+    -- Open trunk
+    if not OpenVehicleTrunk(vehicle) then
+        DebugPrint("Failed to open trunk")
+        return false
+    end
+    
+    -- Get trunk position
+    local trunkPos = GetTrunkPosition(vehicle)
+    if not trunkPos then
+        DebugPrint("Failed to get trunk position")
+        CloseVehicleTrunk(vehicle)
+        return false
+    end
+    
+    -- Spawn loot items from config
+    local trunkItems = Config.VehicleTrunkLoot.trunk_items
+    local spawnedItems = {}
+    
+    for itemName, itemData in pairs(trunkItems) do
+        local count = itemData.count or 1
+        
+        for i = 1, count do
+            local itemObject = SpawnLootItemInTrunk(itemName, 1, trunkPos)
+            if itemObject then
+                table.insert(spawnedItems, itemObject)
+                DebugPrint("Spawned loot item:", itemName, "in trunk")
+            end
+            
+            -- Wait between spawns to prevent overlap
+            Citizen.Wait(100)
+        end
+    end
+    
+    -- Close trunk after filling
+    Citizen.Wait(1000) -- Keep open for 1 second so players can see
+    CloseVehicleTrunk(vehicle)
+    
+    DebugPrint("Stockade trunk filled with", #spawnedItems, "loot items")
+    return spawnedItems
+end
+
 -- Add items to vehicle trunk
 RegisterNetEvent('djonluc_evidence_event:addItemToVehicleTrunk')
-AddEventHandler('djonluc_evidence_event:addItemToVehicleTrunk', function(vehicleNetId, itemName, count)
+AddEventHandler('djonluc_evidence_event:addItemToTrunk', function(vehicleNetId, itemName, count)
+    DebugPrint("Adding items to vehicle trunk:", itemName, "x", count, "Vehicle:", vehicleNetId)
+    
+    -- Convert netId to entity
     local vehicle = NetworkGetEntityFromNetworkId(vehicleNetId)
-    if not vehicle or not DoesEntityExist(vehicle) then return end
+    if not vehicle or not DoesEntityExist(vehicle) then
+        DebugPrint("ERROR: Invalid vehicle for trunk item addition")
+        return
+    end
     
     -- Store items in vehicle trunk
     if not vehicleTrunkItems[vehicleNetId] then
@@ -1254,14 +1404,14 @@ AddEventHandler('djonluc_evidence_event:addItemToVehicleTrunk', function(vehicle
     
     DebugPrint("Added " .. count .. "x " .. itemName .. " to vehicle trunk:", vehicleNetId)
     
-    -- Show notification to nearby players
-    local playerPed = PlayerPedId()
-    local playerCoords = GetEntityCoords(playerPed)
-    local vehicleCoords = GetEntityCoords(vehicle)
-    local distance = #(playerCoords - vehicleCoords)
+    -- Show notification to player
+    TriggerEvent('djonluc_evidence_event:showNotification', '🎒 Evidence vehicle trunk loaded with ' .. count .. 'x ' .. itemName, 'inform')
     
-    if distance < 50.0 then
-        TriggerEvent('djonluc_evidence_event:showNotification', '🎒 Evidence vehicle trunk loaded with ' .. count .. 'x ' .. itemName, 'inform')
+    -- If this is the stockade, also spawn visual loot items
+    local model = GetEntityModel(vehicle)
+    if model == GetHashKey("stockade") then
+        DebugPrint("Stockade detected, spawning visual loot items in trunk")
+        FillStockadeTrunkWithLoot(vehicle)
     end
 end)
 
@@ -1342,7 +1492,7 @@ AddEventHandler('djonluc_evidence_event:spawnDroppedItem', function(position, it
             end
         end)
     end
-end)
+end
 
 -- Function to loot dropped items
 function LootDroppedItem(itemId)
@@ -1417,7 +1567,7 @@ RegisterCommand('access_trunk', function()
     end
     
     TriggerEvent('djonluc_evidence_event:showNotification', '🚗 No evidence vehicle nearby', 'error')
-end, false)
+end)
 
 -- Cleanup convoy
 RegisterNetEvent('djonluc_evidence_event:cleanupConvoy')
@@ -1645,7 +1795,7 @@ function DrawText3D(x, y, z, text)
 end
 
 -- QBCore menu system wrapper (if available)
-function Utils.QBCoreShowMenu(source, menuData)
+local function QBCoreShowMenu(source, menuData)
     if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
         -- Check if qb-menu is available
         if Utils.OptionalDeps.qb_menu then
@@ -1659,7 +1809,7 @@ function Utils.QBCoreShowMenu(source, menuData)
 end
 
 -- QBCore notification wrapper for client-side
-function Utils.QBCoreNotifyClient(message, type, duration)
+local function QBCoreNotifyClient(message, type, duration)
     if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
         -- Latest QBCore notification method with proper parameters
         TriggerEvent('QBCore:Notify', message, type or 'primary', duration or 5000)
@@ -1669,7 +1819,7 @@ function Utils.QBCoreNotifyClient(message, type, duration)
 end
 
 -- QBCore progress bar wrapper for client-side
-function Utils.QBCoreProgressBarClient(duration, label, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
+local function QBCoreProgressBarClient(duration, label, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
     if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
         -- Check if QBCore progress bar is available
         local success = pcall(function()
@@ -1681,7 +1831,7 @@ function Utils.QBCoreProgressBarClient(duration, label, useWhileDead, canCancel,
 end
 
 -- QBCore target system wrapper for client-side
-function Utils.QBCoreAddTargetEntityClient(entity, options)
+local function QBCoreAddTargetEntityClient(entity, options)
     if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
         -- Check if qb-target is available
         if Utils.OptionalDeps.qb_target then
@@ -1695,7 +1845,7 @@ function Utils.QBCoreAddTargetEntityClient(entity, options)
 end
 
 -- QBCore menu system wrapper for client-side
-function Utils.QBCoreShowMenuClient(menuData)
+local function QBCoreShowMenuClient(menuData)
     if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
         -- Check if qb-menu is available
         if Utils.OptionalDeps.qb_menu then
