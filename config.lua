@@ -4,6 +4,16 @@ Config = {}
 Config.StartJobs = {"doj", "leo", "police", "sheriff", "bcso", "state", "fbi", "highway"} -- Jobs allowed to start the event
 Config.GuardIgnoreJobs = {"police", "leo", "sheriff", "bcso", "state", "fbi", "highway"} -- Jobs ignored by escort peds
 
+-- Event Settings
+Config.EventDuration = 1800000 -- Event duration in milliseconds (30 minutes)
+
+-- Debug Settings
+Config.Debug = {
+    enabled = true,
+    verbose_logging = true,
+    show_debug_commands = true
+}
+
 -- Dynamic Route Settings
 Config.DynamicRoutes = {
     enabled = true,
@@ -47,9 +57,7 @@ Config.Peds = {
         behavior = "aggressive",
         health = 200,
         armor = 100,
-        vehicle_assignment = "escort_car", -- Which vehicle type to assign to
-        seat_preference = "driver", -- "driver", "passenger", or "any"
-        driving_style = "defensive" -- "defensive", "aggressive", "normal"
+        seat_preference = "driver" -- "driver", "passenger", or "any"
     },
     escort_swat = {
         model = "s_m_y_swat_01",
@@ -58,26 +66,15 @@ Config.Peds = {
         behavior = "aggressive",
         health = 300,
         armor = 150,
-        vehicle_assignment = "escort_suv", -- Which vehicle type to assign to
-        seat_preference = "driver", -- "driver", "passenger", or "any"
-        driving_style = "defensive" -- "defensive", "aggressive", "normal"
+        seat_preference = "driver" -- "driver", "passenger", or "any"
     }
 }
 
 -- Convoy Formation Settings
 Config.ConvoyFormation = {
-    formation_type = "line", -- "line", "diamond", "wedge", "random"
+    formation_type = "line", -- "line" for single file formation
     spacing = 5.0, -- Distance between vehicles
-    max_convoy_width = 20.0, -- Maximum width of convoy formation
-    evidence_center = true, -- Evidence vehicle spawns in center
-    escort_positions = {
-        front_left = true,
-        front_right = true,
-        rear_left = true,
-        rear_right = true,
-        side_left = true,
-        side_right = true
-    }
+    evidence_center = true -- Evidence vehicle spawns in center
 }
 
 -- Convoy Movement Settings
@@ -87,6 +84,59 @@ Config.ConvoyMovement = {
     formation_maintenance = true, -- Keep formation while moving
     emergency_formation = true, -- Tighten formation when under attack
     max_deviation = 15.0 -- Maximum distance escort vehicles can deviate from formation
+}
+
+-- Blip Settings (matching actual implementation)
+Config.BlipSettings = {
+    evidence_vehicle = {
+        sprite = 67, -- Police car sprite
+        color = 1,   -- Red color
+        scale = 1.0,
+        name = "Evidence Vehicle"
+    },
+    escort_car = {
+        sprite = 56, -- Police car sprite
+        color = 3,   -- Blue color
+        scale = 1.0,
+        name = "Escort Car"
+    },
+    escort_suv = {
+        sprite = 56, -- Police car sprite
+        color = 5,   -- Yellow color
+        scale = 1.0,
+        name = "Escort SUV"
+    },
+    main_convoy = {
+        sprite = 67, -- Police car sprite
+        color = 3,   -- Blue color
+        scale = 1.0,
+        name = "Evidence Convoy"
+    },
+    destination = {
+        sprite = 1,  -- Destination sprite
+        color = 2,   -- Green color
+        scale = 1.0,
+        name = "Destination"
+    },
+    protection_zone = {
+        sprite = 1,  -- Standard sprite
+        color = 1,   -- Red color
+        scale = 50.0,
+        alpha = 128,
+        name = "Protection Zone"
+    },
+    status_indicator = {
+        sprite = 84, -- Checkered flag sprite
+        color = 2,   -- Green for active
+        scale = 1.0,
+        name = "Convoy Status"
+    },
+    route_progress = {
+        sprite = 162, -- Route sprite
+        color = 5,    -- Yellow for route
+        scale = 1.0,
+        name = "Route Progress"
+    }
 }
 
 -- Evidence Items (items transported by convoy)
@@ -137,17 +187,37 @@ Config.Routes = {
     }
 }
 
--- AI Behavior Settings
-Config.EscortAIBehavior = {
-    aggressiveness = "aggressive",
-    patrol_type = "defensive",
-    support_radius = 50.0,
-    alert_radius = 100.0
-}
-
 -- Notification Settings
 Config.Notifications = {
     event_started = "Evidence destruction event started! Convoy spotted near {location}",
     event_ended = "Evidence destruction event ended. Convoy reached destination.",
     event_failed = "Evidence destruction event failed. Convoy was intercepted."
 }
+
+-- ========================================
+-- CONFIG NOTES
+-- ========================================
+-- 
+-- ACTUALLY IMPLEMENTED FEATURES:
+-- ✅ Job restrictions (Config.StartJobs, Config.GuardIgnoreJobs)
+-- ✅ Event duration (Config.EventDuration)
+-- ✅ Debug settings (Config.Debug)
+-- ✅ Dynamic routes (Config.DynamicRoutes)
+-- ✅ Vehicle configuration (Config.Vehicles)
+-- ✅ Ped configuration (Config.Peds)
+-- ✅ Convoy formation (Config.ConvoyFormation)
+-- ✅ Convoy movement (Config.ConvoyMovement)
+-- ✅ Blip settings (Config.BlipSettings) - matches actual implementation
+-- ✅ Evidence items (Config.EvidenceItems)
+-- ✅ Vehicle trunk loot (Config.VehicleTrunkLoot)
+-- ✅ Routes (Config.Routes)
+-- ✅ Notifications (Config.Notifications)
+--
+-- NOT IMPLEMENTED (removed):
+-- ❌ Config.LootSettings - not used in current implementation
+-- ❌ Config.EscortAIBehavior - not used in current implementation
+-- ❌ Config.Peds.*.vehicle_assignment - not used in current implementation
+-- ❌ Config.Peds.*.driving_style - not used in current implementation
+-- ❌ Config.ConvoyFormation.escort_positions - not used in current implementation
+--
+-- ========================================
