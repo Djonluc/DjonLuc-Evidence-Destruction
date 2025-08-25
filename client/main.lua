@@ -879,18 +879,31 @@ function SpawnConvoy(route)
         -- Create enhanced convoy status system
         CreateConvoyStatusSystem()
         
-        -- Set up enhanced ped task management
-        DebugPrint("Setting up enhanced ped task management...")
+        -- Set up enhanced vehicle formation
+        SetupVehicleFormation()
+        
+        -- Set up enhanced ped AI and behavior
+        DebugPrint("Setting up enhanced ped AI and behavior...")
         for i, ped in ipairs(_G.escortPeds) do
             if DoesEntityExist(ped) then
                 local vehicle = GetVehiclePedIsIn(ped, false)
                 if vehicle and DoesEntityExist(vehicle) then
-                    -- Set peds to drive their vehicles in convoy formation
-                    ManagePedTasks(ped, vehicle, "drive")
-                    DebugPrint("Ped", i, "set to drive mode")
+                    -- Set up enhanced AI for the ped
+                    SetupEnhancedPedAI(ped, Config.Peds.escort_cop)
+                    
+                    -- Set up enhanced escort behavior
+                    SetupEscortBehavior(ped, vehicle)
+                    
+                    DebugPrint("Ped", i, "enhanced AI and behavior setup completed")
                 end
             end
         end
+        
+        -- Start enhanced convoy movement
+        EnhancedConvoyMovement()
+        
+        -- Apply enhanced visual effects
+        CreateEnhancedBlipEffects()
     else
         DebugPrint("Failed to spawn evidence vehicle")
     end
@@ -1690,7 +1703,7 @@ Citizen.CreateThread(function()
         
         if eventActive and convoyBlip then
             UpdateConvoyBlip()
-            UpdateConvoyStatus() -- Update convoy status indicators
+            UpdateEnhancedConvoyStatus() -- Update enhanced convoy status indicators
             
             -- Add distance indicator to blip name
             if convoyBlip and IsBlipVisible(convoyBlip) then
@@ -2137,5 +2150,376 @@ RegisterCommand('testenhanced', function()
         end
     end
     
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+end, false)
+
+-- Enhanced vehicle formation and movement system
+local function SetupVehicleFormation()
+    if #convoyVehicles < 2 then
+        DebugPrint("Not enough vehicles for formation setup")
+        return
+    end
+    
+    -- Set evidence vehicle as formation leader
+    local evidenceVehicle = convoyVehicles[1]
+    if not DoesEntityExist(evidenceVehicle) then
+        DebugPrint("Evidence vehicle not found for formation setup")
+        return
+    end
+    
+    DebugPrint("Setting up enhanced vehicle formation...")
+    
+    -- Configure each escort vehicle to follow the evidence vehicle
+    for i = 2, #convoyVehicles do
+        local escortVehicle = convoyVehicles[i]
+        if DoesEntityExist(escortVehicle) then
+            -- Set vehicle to follow the evidence vehicle with proper spacing
+            SetVehicleFollowToEntity(escortVehicle, evidenceVehicle, 20.0, 1, 5.0)
+            
+            -- Set vehicle formation properties
+            SetVehicleFormation(escortVehicle, 1) -- Formation type 1 = follow
+            
+            -- Ensure vehicle stays running
+            SetVehicleEngineOn(escortVehicle, true, true, false)
+            
+            -- Set vehicle to mission entity for better management
+            SetEntityAsMissionEntity(escortVehicle, true, true)
+            
+            DebugPrint("Vehicle", i, "configured for formation following")
+        end
+    end
+    
+    DebugPrint("Enhanced vehicle formation setup completed")
+end
+
+-- Enhanced convoy movement with formation maintenance
+local function EnhancedConvoyMovement()
+    if #convoyVehicles < 2 then
+        return
+    end
+    
+    local evidenceVehicle = convoyVehicles[1]
+    if not DoesEntityExist(evidenceVehicle) then
+        return
+    end
+    
+    -- Set evidence vehicle to drive to destination
+    if eventData and eventData.route and eventData.route.destruction then
+        local destination = eventData.route.destruction
+        local speed = Config.ConvoyMovement.speed or 20.0
+        
+        -- Use enhanced driving task for evidence vehicle
+        TaskVehicleDriveToCoordLongrange(evidenceVehicle, destination.x, destination.y, destination.z, speed, 786603, 5.0)
+        
+        -- Set driving attributes for convoy leader
+        SetDriverAbility(evidenceVehicle, 1.0)
+        SetDriverAggressiveness(evidenceVehicle, 0.2) -- Low aggression for smooth convoy leading
+        
+        DebugPrint("Evidence vehicle set to drive to destination with enhanced movement")
+    end
+    
+    -- Escort vehicles automatically follow due to formation setup
+    DebugPrint("Escort vehicles following evidence vehicle in formation")
+end
+
+-- Enhanced ped combat and AI system
+local function SetupEnhancedPedAI(ped, pedConfig)
+    if not DoesEntityExist(ped) then
+        return false
+    end
+    
+    DebugPrint("Setting up enhanced AI for ped:", ped)
+    
+    -- Enhanced combat attributes for realistic behavior
+    SetPedCombatAttributes(ped, 46, true)  -- Can use cover
+    SetPedCombatAttributes(ped, 5, true)   -- Can fight armed peds
+    SetPedCombatAttributes(ped, 17, true)  -- Can use group tactics
+    SetPedCombatAttributes(ped, 2, true)   -- Can use vehicles
+    SetPedCombatAttributes(ped, 1, true)   -- Can fight armed peds when not armed
+    SetPedCombatAttributes(ped, 0, true)   -- Can use cover
+    SetPedCombatAttributes(ped, 1424, true) -- Can use advanced tactics
+    
+    -- Enhanced combat range and accuracy
+    SetPedCombatRange(ped, 2) -- Medium range combat
+    SetPedAccuracy(ped, 85)   -- High accuracy for professional escorts
+    
+    -- Enhanced combat ability and movement
+    SetPedCombatAbility(ped, 100)      -- Maximum combat ability
+    SetPedCombatMovement(ped, 3)       -- Combat movement type 3 = tactical
+    SetPedCombatRange(ped, 2)          -- Combat range 2 = medium
+    
+    -- Set ped to not flee and maintain position
+    SetPedFleeAttributes(ped, 0, false)
+    SetPedCombatAttributes(ped, 17, true) -- Can use group tactics
+    
+    -- Enhanced weapon handling
+    if pedConfig.weapon then
+        local weaponHash = GetHashKey(pedConfig.weapon)
+        GiveWeaponToPed(ped, weaponHash, 1000, false, true)
+        
+        -- Set weapon-specific combat attributes
+        if pedConfig.weapon == "WEAPON_PISTOL" then
+            SetPedCombatRange(ped, 1) -- Close range for pistols
+        elseif pedConfig.weapon == "WEAPON_CARBINERIFLE" then
+            SetPedCombatRange(ped, 3) -- Long range for rifles
+        end
+    end
+    
+    -- Set ped as mission entity for better management
+    SetEntityAsMissionEntity(ped, true, true)
+    
+    -- Temporary invincibility during setup
+    SetEntityInvincible(ped, true)
+    Citizen.Wait(500)
+    SetEntityInvincible(ped, false)
+    
+    DebugPrint("Enhanced AI setup completed for ped:", ped)
+    return true
+end
+
+-- Enhanced escort behavior system
+local function SetupEscortBehavior(ped, vehicle)
+    if not DoesEntityExist(ped) or not DoesEntityExist(vehicle) then
+        return false
+    end
+    
+    DebugPrint("Setting up enhanced escort behavior for ped:", ped)
+    
+    -- Set ped to escort mode with enhanced AI
+    local vehiclePos = GetEntityCoords(vehicle)
+    local patrolRadius = 15.0 -- Larger patrol radius for better coverage
+    
+    -- Create enhanced patrol points around the vehicle
+    local patrolPoints = {
+        vector3(vehiclePos.x + patrolRadius, vehiclePos.y, vehiclePos.z),
+        vector3(vehiclePos.x - patrolRadius, vehiclePos.y, vehiclePos.z),
+        vector3(vehiclePos.x, vehiclePos.y + patrolRadius, vehiclePos.z),
+        vector3(vehiclePos.x, vehiclePos.y - patrolRadius, vehiclePos.z),
+        vector3(vehiclePos.x + patrolRadius * 0.7, vehiclePos.y + patrolRadius * 0.7, vehiclePos.z),
+        vector3(vehiclePos.x - patrolRadius * 0.7, vehiclePos.y - patrolRadius * 0.7, vehiclePos.z)
+    }
+    
+    -- Set ped to enhanced patrol behavior
+    TaskGoToCoordAnyMeans(ped, patrolPoints[1].x, patrolPoints[1].y, patrolPoints[1].z, 2.0, 0, false, 786603, 0)
+    
+    -- Set ped to look for threats while patrolling
+    SetPedCombatAttributes(ped, 1424, true) -- Advanced threat detection
+    
+    DebugPrint("Enhanced escort behavior setup completed for ped:", ped)
+    return true
+end
+
+-- Enhanced visual effects and blip polish
+local function CreateEnhancedBlipEffects()
+    -- Enhanced main convoy blip with better visual effects
+    if convoyBlip and DoesBlipExist(convoyBlip) then
+        -- Set blip to flash when convoy is active
+        SetBlipFlashes(convoyBlip, true)
+        SetBlipFlashInterval(convoyBlip, 1000) -- Flash every second
+        
+        -- Set blip to short range for better performance
+        SetBlipAsShortRange(convoyBlip, true)
+        
+        -- Add rotation to make blip more dynamic
+        SetBlipRotation(convoyBlip, 0)
+        
+        DebugPrint("Enhanced main convoy blip effects applied")
+    end
+    
+    -- Enhanced vehicle blips with better visual effects
+    for _, blip in pairs(convoyBlips) do
+        if DoesBlipExist(blip) and blip ~= convoyBlips.protectionZone then
+            -- Set vehicle blips to short range for performance
+            SetBlipAsShortRange(blip, true)
+            
+            -- Add subtle flashing to vehicle blips
+            SetBlipFlashes(blip, true)
+            SetBlipFlashInterval(blip, 2000) -- Flash every 2 seconds
+            
+            DebugPrint("Enhanced vehicle blip effects applied")
+        end
+    end
+    
+    -- Enhanced protection zone with better visual effects
+    if convoyBlips.protectionZone and DoesBlipExist(convoyBlips.protectionZone) then
+        -- Set protection zone to pulse effect
+        SetBlipFlashes(convoyBlips.protectionZone, true)
+        SetBlipFlashInterval(convoyBlips.protectionZone, 500) -- Flash every 0.5 seconds
+        
+        -- Make protection zone more visible
+        SetBlipAlpha(convoyBlips.protectionZone, 180) -- More opaque
+        
+        DebugPrint("Enhanced protection zone effects applied")
+    end
+    
+    -- Enhanced status indicator with dynamic effects
+    if convoyBlips.statusIndicator and DoesBlipExist(convoyBlips.statusIndicator) then
+        -- Set status blip to short range
+        SetBlipAsShortRange(convoyBlips.statusIndicator, true)
+        
+        -- Add rotation for dynamic appearance
+        SetBlipRotation(convoyBlips.statusIndicator, 45)
+        
+        DebugPrint("Enhanced status indicator effects applied")
+    end
+end
+
+-- Enhanced convoy status with visual feedback
+local function UpdateEnhancedConvoyStatus()
+    if not convoyBlips.statusIndicator or not eventActive then
+        return
+    end
+    
+    local status = "ACTIVE"
+    local statusColor = 2 -- Green
+    local isUnderAttack = false
+    local isDamaged = false
+    
+    -- Enhanced convoy health monitoring
+    for _, vehicle in ipairs(convoyVehicles) do
+        if DoesEntityExist(vehicle) then
+            local engineHealth = GetVehicleEngineHealth(vehicle)
+            local bodyHealth = GetVehicleBodyHealth(vehicle)
+            
+            if engineHealth < 500 or bodyHealth < 500 then
+                isUnderAttack = true
+                if engineHealth < 200 or bodyHealth < 200 then
+                    isDamaged = true
+                end
+                break
+            end
+        end
+    end
+    
+    -- Enhanced ped status monitoring
+    local deadPeds = 0
+    for _, ped in ipairs(_G.escortPeds) do
+        if DoesEntityExist(ped) and IsEntityDead(ped) then
+            deadPeds = deadPeds + 1
+            isUnderAttack = true
+        end
+    end
+    
+    -- Enhanced status determination
+    if isDamaged then
+        status = "CRITICAL"
+        statusColor = 1 -- Red
+        -- Fast flashing for critical status
+        SetBlipFlashes(convoyBlips.statusIndicator, true)
+        SetBlipFlashInterval(convoyBlips.statusIndicator, 200)
+    elseif isUnderAttack then
+        status = "UNDER ATTACK"
+        statusColor = 1 -- Red
+        -- Medium flashing for attack status
+        SetBlipFlashes(convoyBlips.statusIndicator, true)
+        SetBlipFlashInterval(convoyBlips.statusIndicator, 500)
+    else
+        status = "ACTIVE"
+        statusColor = 2 -- Green
+        -- No flashing for active status
+        SetBlipFlashes(convoyBlips.statusIndicator, false)
+    end
+    
+    -- Update status blip with enhanced visual feedback
+    SetBlipColour(convoyBlips.statusIndicator, statusColor)
+    BeginTextCommandSetBlipName("STRING")
+    AddTextComponentString("Convoy Status: " .. status .. " (" .. deadPeds .. " casualties)")
+    EndTextCommandSetBlipName(convoyBlips.statusIndicator)
+    
+    -- Add visual feedback to protection zone based on status
+    if convoyBlips.protectionZone and DoesBlipExist(convoyBlips.protectionZone) then
+        if isUnderAttack then
+            -- Make protection zone more prominent when under attack
+            SetBlipAlpha(convoyBlips.protectionZone, 255)
+            SetBlipFlashes(convoyBlips.protectionZone, true)
+            SetBlipFlashInterval(convoyBlips.protectionZone, 300)
+        else
+            -- Normal protection zone appearance
+            SetBlipAlpha(convoyBlips.protectionZone, 128)
+            SetBlipFlashes(convoyBlips.protectionZone, false)
+        end
+    end
+    
+    DebugPrint("Enhanced convoy status updated:", status, "Casualties:", deadPeds)
+end
+
+-- Test command for all enhanced FiveM native features
+RegisterCommand('testnatives', function()
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^3[Djonluc Evidence Event]^7 🚀 TESTING ENHANCED FIVEM NATIVES")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    
+    if not eventActive then
+        print("^1[Djonluc Evidence Event]^7 ❌ No active event. Start an event first!")
+        return
+    end
+    
+    print("^3[Djonluc Evidence Event]^7 Enhanced FiveM Native Features:")
+    
+    -- Test vehicle formation
+    print("^3[Djonluc Evidence Event]^7 🚗 Vehicle Formation System:")
+    if #convoyVehicles >= 2 then
+        print("^3[Djonluc Evidence Event]^7   Testing enhanced vehicle formation...")
+        SetupVehicleFormation()
+        print("^2[Djonluc Evidence Event]^7   ✅ Vehicle formation test completed")
+    else
+        print("^1[Djonluc Evidence Event]^7   ❌ Not enough vehicles for formation test")
+    end
+    
+    -- Test enhanced convoy movement
+    print("^3[Djonluc Evidence Event]^7 🚀 Enhanced Convoy Movement:")
+    if #convoyVehicles > 0 then
+        print("^3[Djonluc Evidence Event]^7   Testing enhanced convoy movement...")
+        EnhancedConvoyMovement()
+        print("^2[Djonluc Evidence Event]^7   ✅ Enhanced movement test completed")
+    else
+        print("^1[Djonluc Evidence Event]^7   ❌ No vehicles for movement test")
+    end
+    
+    -- Test enhanced ped AI
+    print("^3[Djonluc Evidence Event]^7 🧍 Enhanced Ped AI System:")
+    if #_G.escortPeds > 0 then
+        print("^3[Djonluc Evidence Event]^7   Testing enhanced ped AI...")
+        local testPed = _G.escortPeds[1]
+        if DoesEntityExist(testPed) then
+            local success = SetupEnhancedPedAI(testPed, Config.Peds.escort_cop)
+            print("^2[Djonluc Evidence Event]^7   ✅ Enhanced ped AI test completed:", success)
+        else
+            print("^1[Djonluc Evidence Event]^7   ❌ Test ped not found")
+        end
+    else
+        print("^1[Djonluc Evidence Event]^7   ❌ No escort peds for AI test")
+    end
+    
+    -- Test enhanced escort behavior
+    print("^3[Djonluc Evidence Event]^7 🛡️ Enhanced Escort Behavior:")
+    if #_G.escortPeds > 0 and #convoyVehicles > 0 then
+        print("^3[Djonluc Evidence Event]^7   Testing enhanced escort behavior...")
+        local testPed = _G.escortPeds[1]
+        local testVehicle = convoyVehicles[1]
+        if DoesEntityExist(testPed) and DoesEntityExist(testVehicle) then
+            local success = SetupEscortBehavior(testPed, testVehicle)
+            print("^2[Djonluc Evidence Event]^7   ✅ Enhanced escort behavior test completed:", success)
+        else
+            print("^1[Djonluc Evidence Event]^7   ❌ Test entities not found")
+        end
+    else
+        print("^1[Djonluc Evidence Event]^7   ❌ Not enough entities for behavior test")
+    end
+    
+    -- Test enhanced visual effects
+    print("^3[Djonluc Evidence Event]^7 🎨 Enhanced Visual Effects:")
+    print("^3[Djonluc Evidence Event]^7   Testing enhanced blip effects...")
+    CreateEnhancedBlipEffects()
+    print("^2[Djonluc Evidence Event]^7   ✅ Enhanced visual effects test completed")
+    
+    -- Test enhanced status system
+    print("^3[Djonluc Evidence Event]^7 📊 Enhanced Status System:")
+    print("^3[Djonluc Evidence Event]^7   Testing enhanced status update...")
+    UpdateEnhancedConvoyStatus()
+    print("^2[Djonluc Evidence Event]^7   ✅ Enhanced status test completed")
+    
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^2[Djonluc Evidence Event]^7 🎉 All enhanced FiveM native tests completed!")
     print("^3[Djonluc Evidence Event]^7 ========================================")
 end, false)

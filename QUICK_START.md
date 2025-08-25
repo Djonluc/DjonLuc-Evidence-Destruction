@@ -231,22 +231,13 @@ start = vector4(-1037.89, -2738.56, 20.17, 327.0)
 
 **🎯 Ready to start? Use `/preset police` and then `/startevidence`!**
 
-## 🚗 Convoy Formation System
-
-The convoy now spawns in a **single file line formation** with the evidence vehicle at the front:
-
-- **Evidence Vehicle**: Spawns at the front (your spawn coordinates)
-- **Escort Cars**: Spawn behind the evidence vehicle in a line
-- **Escort SUVs**: Spawn behind the escort cars in a line
-- **Formation**: Vehicles are spaced 5.0 meters apart in a single file line
-
 ## 🚀 Enhanced Professional Features
 
 ### **📍 Advanced Blip System**
 
 - **Individual Vehicle Tracking**: Each convoy vehicle has its own blip
-- **Convoy Status Indicator**: Shows if convoy is ACTIVE or UNDER ATTACK
-- **Protection Zone**: 50m radius red zone around convoy
+- **Convoy Status Indicator**: Shows if convoy is ACTIVE, UNDER ATTACK, or CRITICAL
+- **Protection Zone**: 50m radius red zone around convoy with dynamic effects
 - **Route Progress**: Visual indicator at route midpoint
 - **Dynamic Distance**: Real-time distance to convoy
 
@@ -256,13 +247,23 @@ The convoy now spawns in a **single file line formation** with the evidence vehi
 - **Formation Maintenance**: Vehicles maintain proper convoy spacing
 - **Instant Response**: Uses `CLEAR_PED_TASKS_IMMEDIATELY` for quick reactions
 - **Professional Behavior**: Realistic convoy driving patterns
+- **Advanced Combat Attributes**: Sophisticated combat behavior and tactics
+- **Enhanced Accuracy**: Professional-level shooting and engagement
 
 ### **🎯 Professional Appearance**
 
 - **Color-Coded Blips**: Different colors for different vehicle types
-- **Status Indicators**: Real-time convoy health and status
+- **Status Indicators**: Real-time convoy health and status with flashing effects
 - **Route Visualization**: Clear path from start to destination
 - **Police Operation Look**: Professional appearance like real law enforcement
+- **Dynamic Visual Effects**: Enhanced blip flashing, rotation, and status feedback
+
+### **🚗 Enhanced Vehicle Formation**
+
+- **Smart Following**: Uses `SetVehicleFollowToEntity` for natural convoy movement
+- **Formation Maintenance**: `SetVehicleFormation` keeps vehicles in proper spacing
+- **Enhanced Movement**: Better driving tasks and convoy coordination
+- **Mission Entity Management**: Proper entity handling for stability
 
 ### Debug Commands
 
@@ -274,3 +275,4 @@ Use these commands to troubleshoot and test the system:
 - `/testvehicles` - Test vehicle spawning and positioning
 - `/testcoords` - Check vehicle coordinates and spawn points
 - `/testenhanced` - Test all enhanced convoy system features
+- `/testnatives` - Test all enhanced FiveM native features
