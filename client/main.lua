@@ -784,27 +784,34 @@ function SpawnEscortPeds(evidenceVehicle)
     DebugPrint("Available escort_car vehicles:", #escortVehiclesByType.escort_car)
     DebugPrint("Config escort_cop count:", Config.Peds.escort_cop.count)
     
-    for i = 1, Config.Peds.escort_cop.count do
-        local targetVehicle = escortVehiclesByType.escort_car[i]
-        local isDriver = Config.Peds.escort_cop.seat_preference == "driver"
-        
-        DebugPrint("Attempting to spawn escort cop", i, "in vehicle:", targetVehicle, "isDriver:", isDriver)
-        if targetVehicle and DoesEntityExist(targetVehicle) then
-            local ped = SpawnEscortPed(Config.Peds.escort_cop, targetVehicle, isDriver)
-            if ped then
-                DebugPrint("Escort cop", i, "spawned successfully:", ped, "in vehicle:", targetVehicle)
-                table.insert(_G.escortPeds, ped)
-                pedCount = pedCount + 1
-                DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
-            else
-                DebugPrint("Failed to spawn escort cop", i)
+    local copIndex = 1
+    for _, vehicle in ipairs(escortVehiclesByType.escort_car) do
+        if DoesEntityExist(vehicle) then
+            -- Fill all 4 seats in police car
+            for seat = 0, 3 do -- 0 = front passenger, 1 = back left, 2 = back right, -1 = driver
+                if copIndex <= Config.Peds.escort_cop.count then
+                    local isDriver = (seat == -1)
+                    local seatIndex = (seat == -1) and 0 or seat -- Adjust for TaskWarpPedIntoVehicle
+                    
+                    DebugPrint("Attempting to spawn escort cop", copIndex, "in vehicle:", vehicle, "seat:", seat, "isDriver:", isDriver)
+                    local ped = SpawnEscortPed(Config.Peds.escort_cop, vehicle, isDriver, seatIndex)
+                    if ped then
+                        DebugPrint("Escort cop", copIndex, "spawned successfully:", ped, "in vehicle:", vehicle, "seat:", seat)
+                        table.insert(_G.escortPeds, ped)
+                        pedCount = pedCount + 1
+                        DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+                        copIndex = copIndex + 1
+                    else
+                        DebugPrint("Failed to spawn escort cop", copIndex)
+                    end
+                    
+                    -- Wait between spawning peds to prevent interference
+                    Citizen.Wait(200)
+                else
+                    break -- No more cops to spawn
+                end
             end
-        else
-            DebugPrint("ERROR: Target vehicle for escort cop", i, "is invalid or doesn't exist")
         end
-        
-        -- Wait between spawning peds to prevent interference
-        Citizen.Wait(200)
     end
     
     -- Spawn escort SWAT and assign to escort SUVs
@@ -812,38 +819,79 @@ function SpawnEscortPeds(evidenceVehicle)
     DebugPrint("Available escort_suv vehicles:", #escortVehiclesByType.escort_suv)
     DebugPrint("Config escort_swat count:", Config.Peds.escort_swat.count)
     
-    for i = 1, Config.Peds.escort_swat.count do
-        local targetVehicle = escortVehiclesByType.escort_suv[i]
-        local isDriver = Config.Peds.escort_swat.seat_preference == "driver"
-        
-        DebugPrint("Attempting to spawn escort SWAT", i, "in vehicle:", targetVehicle, "isDriver:", isDriver)
-        if targetVehicle and DoesEntityExist(targetVehicle) then
-            local ped = SpawnEscortPed(Config.Peds.escort_swat, targetVehicle, isDriver)
-            if ped then
-                DebugPrint("Escort SWAT", i, "spawned successfully:", ped, "in vehicle:", targetVehicle)
-                table.insert(_G.escortPeds, ped)
-                pedCount = pedCount + 1
-                DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
-            else
-                DebugPrint("Failed to spawn escort SWAT", i)
+    local swatIndex = 1
+    for _, vehicle in ipairs(escortVehiclesByType.escort_suv) do
+        if DoesEntityExist(vehicle) then
+            -- Fill all 4 seats in FBI SUV
+            for seat = 0, 3 do -- 0 = front passenger, 1 = back left, 2 = back right, -1 = driver
+                if swatIndex <= Config.Peds.escort_swat.count then
+                    local isDriver = (seat == -1)
+                    local seatIndex = (seat == -1) and 0 or seat -- Adjust for TaskWarpPedIntoVehicle
+                    
+                    DebugPrint("Attempting to spawn escort SWAT", swatIndex, "in vehicle:", vehicle, "seat:", seat, "isDriver:", isDriver)
+                    local ped = SpawnEscortPed(Config.Peds.escort_swat, vehicle, isDriver, seatIndex)
+                    if ped then
+                        DebugPrint("Escort SWAT", swatIndex, "spawned successfully:", ped, "in vehicle:", vehicle, "seat:", seat)
+                        table.insert(_G.escortPeds, ped)
+                        pedCount = pedCount + 1
+                        DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+                        swatIndex = swatIndex + 1
+                    else
+                        DebugPrint("Failed to spawn escort SWAT", swatIndex)
+                    end
+                    
+                    -- Wait between spawning peds to prevent interference
+                    Citizen.Wait(200)
+                else
+                    break -- No more SWAT to spawn
+                end
             end
-        else
-            DebugPrint("ERROR: Target vehicle for escort SWAT", i, "is invalid or doesn't exist")
         end
-        
-        -- Wait between spawning peds to prevent interference
-        Citizen.Wait(200)
     end
     
-    -- Update server with ped count
-    TriggerServerEvent('djonluc_evidence_event:updatePedCount', pedCount)
+    -- Spawn evidence vehicle peds (driver + passenger for stockade)
+    DebugPrint("Spawning evidence vehicle peds...")
+    DebugPrint("Available evidence vehicles:", #escortVehiclesByType.evidence_van)
+    DebugPrint("Config evidence_driver count:", Config.Peds.evidence_driver.count)
+    
+    local evidenceIndex = 1
+    for _, vehicle in ipairs(escortVehiclesByType.evidence_van) do
+        if DoesEntityExist(vehicle) then
+            -- Fill both seats in stockade (driver + passenger)
+            for seat = 0, 1 do -- 0 = driver, 1 = passenger
+                if evidenceIndex <= Config.Peds.evidence_driver.count then
+                    local isDriver = (seat == 0)
+                    local seatIndex = seat
+                    
+                    DebugPrint("Attempting to spawn evidence driver", evidenceIndex, "in vehicle:", vehicle, "seat:", seat, "isDriver:", isDriver)
+                    local ped = SpawnEscortPed(Config.Peds.evidence_driver, vehicle, isDriver, seatIndex)
+                    if ped then
+                        DebugPrint("Evidence driver", evidenceIndex, "spawned successfully:", ped, "in vehicle:", vehicle, "seat:", seat)
+                        table.insert(_G.escortPeds, ped)
+                        pedCount = pedCount + 1
+                        DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+                        evidenceIndex = evidenceIndex + 1
+                    else
+                        DebugPrint("Failed to spawn evidence driver", evidenceIndex)
+                    end
+                    
+                    -- Wait between spawning peds to prevent interference
+                    Citizen.Wait(200)
+                else
+                    break -- No more evidence drivers to spawn
+                end
+            end
+        end
+    end
     
     DebugPrint("Total peds spawned:", pedCount)
     DebugPrint("Final escortPeds count:", #_G.escortPeds)
+    
+    return pedCount
 end
 
-function SpawnEscortPed(pedConfig, vehicle, isDriver)
-    DebugPrint("SpawnEscortPed called with config:", pedConfig.model, "vehicle:", vehicle, "isDriver:", isDriver)
+function SpawnEscortPed(pedConfig, vehicle, isDriver, seatIndex)
+    DebugPrint("SpawnEscortPed called with config:", pedConfig.model, "vehicle:", vehicle, "isDriver:", isDriver, "seatIndex:", seatIndex)
     
     if not pedConfig or not pedConfig.model then
         DebugPrint("ERROR: Invalid ped config - missing model")
@@ -948,9 +996,7 @@ function SpawnEscortPed(pedConfig, vehicle, isDriver)
     -- Wait for ped to fully spawn (FiveM best practice)
     Citizen.Wait(100)
     
-    -- Place ped in vehicle
-    local seatIndex = isDriver and -1 or 0  -- -1 = driver, 0 = front passenger
-    
+    -- Place ped in vehicle using the seatIndex parameter
     DebugPrint("Placing ped in vehicle seat:", seatIndex, "isDriver:", isDriver)
     
     -- Try to place ped in vehicle (FiveM best practice)

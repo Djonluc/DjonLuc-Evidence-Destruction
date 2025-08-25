@@ -48,25 +48,54 @@ Config.Vehicles = {
     }
 }
 
--- Ped Configuration
+-- Ped Configuration - All seats filled for maximum security
+-- 
+-- SEATING ARRANGEMENT:
+-- 🚗 Police Cars (2): 4 seats each = 8 cops total
+--   - Driver seat (-1): 1 cop per car
+--   - Front passenger (0): 1 cop per car  
+--   - Back left (1): 1 cop per car
+--   - Back right (2): 1 cop per car
+--
+-- 🚙 FBI SUV (1): 4 seats = 4 SWAT total
+--   - Driver seat (-1): 1 SWAT
+--   - Front passenger (0): 1 SWAT
+--   - Back left (1): 1 SWAT
+--   - Back right (2): 1 SWAT
+--
+-- 🚐 Stockade (1): 2 seats = 2 cops total
+--   - Driver seat (0): 1 cop
+--   - Passenger seat (1): 1 cop
+--
+-- TOTAL: 14 armed officers protecting the convoy
+--
 Config.Peds = {
     escort_cop = {
         model = "s_m_y_cop_01",
         weapon = "WEAPON_PISTOL",
-        count = 2,
+        count = 8, -- 2 police cars × 4 seats = 8 cops
         behavior = "aggressive",
         health = 200,
         armor = 100,
-        seat_preference = "driver" -- "driver", "passenger", or "any"
+        seat_preference = "any" -- Fill any available seat
     },
     escort_swat = {
         model = "s_m_y_swat_01",
         weapon = "WEAPON_CARBINERIFLE",
-        count = 1,
+        count = 4, -- 1 FBI SUV × 4 seats = 4 SWAT
         behavior = "aggressive",
         health = 300,
         armor = 150,
-        seat_preference = "driver" -- "driver", "passenger", or "any"
+        seat_preference = "any" -- Fill any available seat
+    },
+    evidence_driver = {
+        model = "s_m_y_cop_01",
+        weapon = "WEAPON_PISTOL",
+        count = 2, -- Stockade has 2 seats (driver + passenger)
+        behavior = "aggressive",
+        health = 250,
+        armor = 150,
+        seat_preference = "any" -- Fill any available seat
     }
 }
 
@@ -204,7 +233,7 @@ Config.Notifications = {
 -- ✅ Debug settings (Config.Debug)
 -- ✅ Dynamic routes (Config.DynamicRoutes)
 -- ✅ Vehicle configuration (Config.Vehicles)
--- ✅ Ped configuration (Config.Peds)
+-- ✅ Ped configuration (Config.Peds) - ALL SEATS FILLED
 -- ✅ Convoy formation (Config.ConvoyFormation)
 -- ✅ Convoy movement (Config.ConvoyMovement)
 -- ✅ Blip settings (Config.BlipSettings) - matches actual implementation
@@ -212,6 +241,12 @@ Config.Notifications = {
 -- ✅ Vehicle trunk loot (Config.VehicleTrunkLoot)
 -- ✅ Routes (Config.Routes)
 -- ✅ Notifications (Config.Notifications)
+--
+-- NEW: FULL SEATING CONFIGURATION
+-- 🚗 2 Police Cars: 8 cops (4 seats × 2 cars)
+-- 🚙 1 FBI SUV: 4 SWAT (4 seats × 1 SUV)  
+-- 🚐 1 Stockade: 2 cops (2 seats × 1 van)
+-- 🎯 TOTAL: 14 armed officers protecting the convoy
 --
 -- NOT IMPLEMENTED (removed):
 -- ❌ Config.LootSettings - not used in current implementation
