@@ -350,35 +350,62 @@ local function ShowEventStartMenu()
             end
         end
     elseif Utils.OptionalDeps and Utils.OptionalDeps.qb_menu then
-        DebugPrint("Using qb-menu")
-        -- qb-menu
-        local success = pcall(function()
-            exports['qb-menu']:openMenu({
-                {
-                    header = "Evidence Destruction Event",
-                    isMenuHeader = true
-                },
-                {
-                    header = "Start Event",
-                    txt = "Start a high-security convoy escort mission",
-                    params = {
-                        event = "djonluc_evidence_event:requestStartEvent"
-                    }
-                },
-                {
-                    header = "Event Status",
-                    txt = "Check current event status",
-                    params = {
-                        event = "djonluc_evidence_event:requestEventStatus"
-                    }
+        DebugPrint("Using qb-menu with latest QBCore standards")
+        -- Use the new QBCore menu wrapper function
+        local success = Utils.QBCoreShowMenuClient({
+            {
+                header = "Evidence Destruction Event",
+                isMenuHeader = true
+            },
+            {
+                header = "Start Event",
+                txt = "Start a high-security convoy escort mission",
+                params = {
+                    event = "djonluc_evidence_event:requestStartEvent"
                 }
-            })
-        end)
+            },
+            {
+                header = "Event Status",
+                txt = "Check current event status",
+                params = {
+                    event = "djonluc_evidence_event:requestEventStatus"
+                }
+            }
+        })
         
         if success then
-            DebugPrint("qb-menu opened successfully")
+            DebugPrint("qb-menu opened successfully using QBCore wrapper")
         else
-            DebugPrint("qb-menu failed")
+            DebugPrint("qb-menu failed, trying direct export")
+            -- Fallback to direct export
+            local directSuccess = pcall(function()
+                exports['qb-menu']:openMenu({
+                    {
+                        header = "Evidence Destruction Event",
+                        isMenuHeader = true
+                    },
+                    {
+                        header = "Start Event",
+                        txt = "Start a high-security convoy escort mission",
+                        params = {
+                            event = "djonluc_evidence_event:requestStartEvent"
+                        }
+                    },
+                    {
+                        header = "Event Status",
+                        txt = "Check current event status",
+                        params = {
+                            event = "djonluc_evidence_event:requestEventStatus"
+                        }
+                    }
+                })
+            end)
+            
+            if directSuccess then
+                DebugPrint("Direct qb-menu export successful")
+            else
+                DebugPrint("Direct qb-menu export failed")
+            end
         end
     else
         DebugPrint("No menu system available, using fallback")
@@ -1092,7 +1119,6 @@ function SpawnEscortPed(pedConfig, vehicle, isDriver)
     -- Clean up model (FiveM best practice)
     SetModelAsNoLongerNeeded(pedHash)
     
-    DebugPrint("Ped setup completed successfully:", ped)
     return ped
 end
 
@@ -1652,4 +1678,68 @@ function DrawText3D(x, y, z, text)
         AddTextComponentString(text)
         DrawText(_x, _y)
     end
+end
+
+-- QBCore menu system wrapper (if available)
+function Utils.QBCoreShowMenu(source, menuData)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if qb-menu is available
+        if Utils.OptionalDeps.qb_menu then
+            local success = pcall(function()
+                TriggerClientEvent('qb-menu:client:openMenu', source, menuData)
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+-- QBCore notification wrapper for client-side
+function Utils.QBCoreNotifyClient(message, type, duration)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Latest QBCore notification method with proper parameters
+        TriggerEvent('QBCore:Notify', message, type or 'primary', duration or 5000)
+        return true
+    end
+    return false
+end
+
+-- QBCore progress bar wrapper for client-side
+function Utils.QBCoreProgressBarClient(duration, label, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if QBCore progress bar is available
+        local success = pcall(function()
+            TriggerEvent('QBCore:Progressbar', duration, label, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
+        end)
+        return success
+    end
+    return false
+end
+
+-- QBCore target system wrapper for client-side
+function Utils.QBCoreAddTargetEntityClient(entity, options)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if qb-target is available
+        if Utils.OptionalDeps.qb_target then
+            local success = pcall(function()
+                exports['qb-target']:AddTargetEntity(entity, options)
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+-- QBCore menu system wrapper for client-side
+function Utils.QBCoreShowMenuClient(menuData)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if qb-menu is available
+        if Utils.OptionalDeps.qb_menu then
+            local success = pcall(function()
+                TriggerEvent('qb-menu:client:openMenu', menuData)
+            end)
+            return success
+        end
+    end
+    return false
 end

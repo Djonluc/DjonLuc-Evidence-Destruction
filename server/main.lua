@@ -70,7 +70,13 @@ function StartEvidenceEvent(source)
     
     if not player then
         print("^1[Djonluc Evidence Event]^7 ERROR: Player not found")
-        TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'Player not found')
+        -- Use QBCore notification if available (FiveM best practice)
+        if Utils.QBCoreNotify(source, 'Player not found', 'error', 5000) then
+            -- QBCore notification sent successfully
+        else
+            -- Fallback to basic notification
+            TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'Player not found')
+        end
         return false
     end
     
@@ -79,13 +85,25 @@ function StartEvidenceEvent(source)
     
     if not Utils.HasRequiredJob(playerJob) then
         print("^1[Djonluc Evidence Event]^7 ERROR: Player does not have required job. Required jobs:", table.concat(Config.StartJobs, ", "))
-        TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'You do not have permission to start this event')
+        -- Use QBCore notification if available (FiveM best practice)
+        if Utils.QBCoreNotify(source, 'You do not have permission to start this event', 'error', 5000) then
+            -- QBCore notification sent successfully
+        else
+            -- Fallback to basic notification
+            TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'You do not have permission to start this event')
+        end
         return false
     end
     
     if eventActive then
         print("^3[Djonluc Evidence Event]^7 Event already active")
-        TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'Event already in progress')
+        -- Use QBCore notification if available (FiveM best practice)
+        if Utils.QBCoreNotify(source, 'Event already in progress', 'warning', 5000) then
+            -- QBCore notification sent successfully
+        else
+            -- Fallback to basic notification
+            TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'Event already in progress')
+        end
         return false
     end
     

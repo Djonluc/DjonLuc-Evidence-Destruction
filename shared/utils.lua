@@ -26,7 +26,48 @@ Citizen.CreateThread(function()
     local retryCount = 0
     
     local function detectFramework()
-        -- Try ESX first (most common)
+        -- Try QBCore first (primary framework - most common)
+        if GetResourceState('qb-core') == 'started' then
+            local success, QBCore = pcall(function()
+                -- Official QBCore method: GetCoreObject()
+                local core = exports['qb-core']:GetCoreObject()
+                -- Validate QBCore object has required methods (FiveM best practice)
+                if core and core.Functions and core.Functions.GetPlayer then
+                    return core
+                end
+                return nil
+            end)
+            if success and QBCore then
+                Utils.Framework.name = "qbcore"
+                Utils.Framework.version = "latest"
+                Utils.Framework.object = QBCore
+                print("^2[Djonluc Evidence Event]^7 QBCore Framework detected via official method")
+                return true
+            else
+                print("^3[Djonluc Evidence Event]^7 QBCore detected but GetCoreObject() failed or invalid")
+            end
+        end
+        
+        -- Try QBox (QBCore-based framework)
+        if GetResourceState('qbox-core') == 'started' then
+            local success, QBox = pcall(function()
+                local core = exports['qbox-core']:GetCoreObject()
+                -- Validate QBox object has required methods (FiveM best practice)
+                if core and core.Functions and core.Functions.GetPlayer then
+                    return core
+                end
+                return nil
+            end)
+            if success and QBox then
+                Utils.Framework.name = "qbox"
+                Utils.Framework.version = "latest"
+                Utils.Framework.object = QBox
+                print("^2[Djonluc Evidence Event]^7 QBox Framework detected")
+                return true
+            end
+        end
+        
+        -- Try ESX (fallback)
         if GetResourceState('es_extended') == 'started' then
             -- Try ESX Legacy export method first (more reliable)
             local success, ESX = pcall(function()
@@ -54,23 +95,6 @@ Citizen.CreateThread(function()
             Citizen.Wait(1000)
             if Utils.Framework.name == "esx" then
                 return true
-            end
-        end
-        
-        -- Try QBCore
-        if GetResourceState('qb-core') == 'started' then
-            local success, QBCore = pcall(function()
-                -- Official QBCore method: GetCoreObject()
-                return exports['qb-core']:GetCoreObject()
-            end)
-            if success and QBCore then
-                Utils.Framework.name = "qbcore"
-                Utils.Framework.version = "latest"
-                Utils.Framework.object = QBCore
-                print("^2[Djonluc Evidence Event]^7 QBCore Framework detected via official method")
-                return true
-            else
-                print("^3[Djonluc Evidence Event]^7 QBCore detected but GetCoreObject() failed")
             end
         end
         
@@ -506,7 +530,8 @@ function Utils.ShowNotification(source, message, type)
     if Utils.Framework.name == "esx" then
         TriggerClientEvent('esx:showNotification', source, message)
     elseif Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
-        TriggerClientEvent('QBCore:Notify', source, message, type or 'primary')
+        -- Latest QBCore notification method (FiveM best practice)
+        TriggerClientEvent('QBCore:Notify', source, message, type or 'primary', 5000)
     elseif Utils.Framework.name == "vrp" then
         TriggerClientEvent('chatMessage', source, '^2[Djonluc Evidence Event]^7', {255, 255, 255}, message)
     else
@@ -548,6 +573,172 @@ function Utils.IsOxLibAvailable()
     end)
     
     return success
+end
+
+-- QBCore-specific utility functions (FiveM best practice)
+function Utils.GetQBCorePlayer(source)
+    if not Utils.IsFrameworkReady() or (Utils.Framework.name ~= "qbcore" and Utils.Framework.name ~= "qbox") then
+        return nil
+    end
+    
+    local success, Player = pcall(function()
+        return Utils.Framework.object.Functions.GetPlayer(source)
+    end)
+    
+    if success and Player then
+        return Player
+    end
+    
+    return nil
+end
+
+-- Get player job using latest QBCore method
+function Utils.GetQBCorePlayerJob(source)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.PlayerData and Player.PlayerData.job then
+        return Player.PlayerData.job.name, Player.PlayerData.job.grade
+    end
+    return "unemployed", 0
+end
+
+-- Get player money using latest QBCore method
+function Utils.GetQBCorePlayerMoney(source, moneyType)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.GetMoney then
+        local success, money = pcall(function()
+            return Player.Functions.GetMoney(moneyType or "cash")
+        end)
+        if success then
+            return money
+        end
+    end
+    return 0
+end
+
+-- Add money to player using latest QBCore method
+function Utils.AddQBCorePlayerMoney(source, moneyType, amount, reason)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.AddMoney then
+        local success = pcall(function()
+            Player.Functions.AddMoney(moneyType or "cash", amount, reason or "Evidence Event")
+        end)
+        return success
+    end
+    return false
+end
+
+-- Remove money from player using latest QBCore method
+function Utils.RemoveQBCorePlayerMoney(source, moneyType, amount, reason)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.RemoveMoney then
+        local success = pcall(function()
+            Player.Functions.RemoveMoney(moneyType or "cash", amount, reason or "Evidence Event")
+        end)
+        return success
+    end
+    return false
+end
+
+-- Give item to player using latest QBCore method
+function Utils.GiveQBCorePlayerItem(source, item, amount, slot, info)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.AddItem then
+        local success = pcall(function()
+            Player.Functions.AddItem(item, amount, slot, info)
+        end)
+        return success
+    end
+    return false
+end
+
+-- Remove item from player using latest QBCore method
+function Utils.RemoveQBCorePlayerItem(source, item, amount, slot)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.RemoveItem then
+        local success = pcall(function()
+            Player.Functions.RemoveItem(item, amount, slot)
+        end)
+        return success
+    end
+    return false
+end
+
+-- Check if player has item using latest QBCore method
+function Utils.QBCorePlayerHasItem(source, item, amount)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.GetItemByName then
+        local success, itemData = pcall(function()
+            return Player.Functions.GetItemByName(item)
+        end)
+        if success and itemData then
+            return itemData.amount >= (amount or 1)
+        end
+    end
+    return false
+end
+
+-- Get player inventory using latest QBCore method
+function Utils.GetQBCorePlayerInventory(source)
+    local Player = Utils.GetQBCorePlayer(source)
+    if Player and Player.Functions.GetItemsByName then
+        local success, items = pcall(function()
+            return Player.Functions.GetItemsByName()
+        end)
+        if success then
+            return items
+        end
+    end
+    return {}
+end
+
+-- QBCore notification wrapper (latest standard)
+function Utils.QBCoreNotify(source, message, type, duration)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Latest QBCore notification method with proper parameters
+        TriggerClientEvent('QBCore:Notify', source, message, type or 'primary', duration or 5000)
+        return true
+    end
+    return false
+end
+
+-- QBCore progress bar wrapper (if available)
+function Utils.QBCoreProgressBar(source, duration, label, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if QBCore progress bar is available
+        local success = pcall(function()
+            TriggerClientEvent('QBCore:Progressbar', source, duration, label, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
+        end)
+        return success
+    end
+    return false
+end
+
+-- QBCore target system wrapper (if available)
+function Utils.QBCoreAddTargetEntity(entity, options)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if qb-target is available
+        if Utils.OptionalDeps.qb_target then
+            local success = pcall(function()
+                exports['qb-target']:AddTargetEntity(entity, options)
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+-- QBCore menu system wrapper (if available)
+function Utils.QBCoreShowMenu(source, menuData)
+    if Utils.Framework.name == "qbcore" or Utils.Framework.name == "qbox" then
+        -- Check if qb-menu is available
+        if Utils.OptionalDeps.qb_menu then
+            local success = pcall(function()
+                TriggerClientEvent('qb-menu:client:openMenu', source, menuData)
+            end)
+            return success
+        end
+    end
+    return false
 end
 
 -- Test ox_lib functionality
