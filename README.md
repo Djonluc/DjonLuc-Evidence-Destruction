@@ -323,4 +323,4 @@ This script is developed by DjonLuc for the FiveM community. Please respect the 
 
 **🎯 Ready to deploy high-security convoy missions? Start with the installation guide above and join our Discord for support!**
 
-_Last Updated: December 2025_
+_Last Updated: August 2025_
