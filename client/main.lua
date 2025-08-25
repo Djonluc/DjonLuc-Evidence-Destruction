@@ -70,10 +70,10 @@ RegisterCommand('debugspawn', function()
     print("^3[Djonluc Evidence Event]^7 ========================================")
 end, false)
 
--- Test command to spawn a single ped in a specific vehicle
+-- Test command to spawn peds in specific vehicles
 RegisterCommand('testpedspawn', function()
     print("^3[Djonluc Evidence Event]^7 ========================================")
-    print("^3[Djonluc Evidence Event]^7 🧪 TESTING SINGLE PED SPAWN")
+    print("^3[Djonluc Evidence Event]^7 🧪 TESTING PED SPAWNING IN VEHICLES")
     print("^3[Djonluc Evidence Event]^7 ========================================")
     
     if #convoyVehicles == 0 then
@@ -81,51 +81,119 @@ RegisterCommand('testpedspawn', function()
         return
     end
     
-    -- Find the first escort vehicle
-    local targetVehicle = nil
+    -- Find vehicles by type
+    local escortCars = {}
+    local escortSuvs = {}
+    
     for i, vehicle in ipairs(convoyVehicles) do
         if DoesEntityExist(vehicle) then
             local model = GetEntityModel(vehicle)
-            local modelName = GetDisplayNameFromVehicleModel(model)
-            print("^3[Djonluc Evidence Event]^7 Found vehicle " .. i .. ": " .. modelName .. " (" .. model .. ")")
+            local expectedCarHash = GetHashKey(Config.Vehicles.escort_car.model)
+            local expectedSuvHash = GetHashKey(Config.Vehicles.escort_suv.model)
             
-            -- Use the first non-evidence vehicle
-            if model ~= GetHashKey("stockade") then
-                targetVehicle = vehicle
-                print("^2[Djonluc Evidence Event]^7 ✅ Using vehicle " .. i .. " for ped spawn test")
-                break
+            if model == expectedCarHash then
+                table.insert(escortCars, vehicle)
+            elseif model == expectedSuvHash then
+                table.insert(escortSuvs, vehicle)
             end
         end
     end
     
-    if not targetVehicle then
-        print("^1[Djonluc Evidence Event]^7 ❌ No suitable escort vehicle found for testing")
+    print("^3[Djonluc Evidence Event]^7 Found vehicles:")
+    print("^3[Djonluc Evidence Event]^7   Escort cars:", #escortCars)
+    print("^3[Djonluc Evidence Event]^7   Escort SUVs:", #escortSuvs)
+    
+    -- Test spawning a cop in first escort car
+    if #escortCars > 0 then
+        print("^3[Djonluc Evidence Event]^7 Testing cop spawn in first escort car...")
+        local testPed = SpawnEscortPed(Config.Peds.escort_cop, escortCars[1], true)
+        if testPed then
+            print("^2[Djonluc Evidence Event]^7 ✅ Cop spawned successfully in escort car!")
+            table.insert(_G.escortPeds, testPed)
+            print("^3[Djonluc Evidence Event]^7 Ped added to escortPeds table. New count:", #_G.escortPeds)
+        else
+            print("^1[Djonluc Evidence Event]^7 ❌ Failed to spawn cop in escort car")
+        end
+    end
+    
+    -- Test spawning SWAT in first escort SUV
+    if #escortSuvs > 0 then
+        print("^3[Djonluc Evidence Event]^7 Testing SWAT spawn in first escort SUV...")
+        local testPed = SpawnEscortPed(Config.Peds.escort_swat, escortSuvs[1], true)
+        if testPed then
+            print("^2[Djonluc Evidence Event]^7 ✅ SWAT spawned successfully in escort SUV!")
+            table.insert(_G.escortPeds, testPed)
+            print("^3[Djonluc Evidence Event]^7 Ped added to escortPeds table. New count:", #_G.escortPeds)
+        else
+            print("^1[Djonluc Evidence Event]^7 ❌ Failed to spawn SWAT in escort SUV")
+        end
+    end
+    
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+end, false)
+
+-- Test command to check convoy formation
+RegisterCommand('testformation', function()
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^3[Djonluc Evidence Event]^7 🚗 TESTING CONVOY FORMATION")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    
+    if #convoyVehicles == 0 then
+        print("^1[Djonluc Evidence Event]^7 ❌ No convoy vehicles found. Start an event first!")
         return
     end
     
-    -- Try to spawn a test ped
-    print("^3[Djonluc Evidence Event]^7 Attempting to spawn test ped...")
-    local testPedConfig = {
-        model = "s_m_y_cop_01",
-        weapon = "WEAPON_PISTOL",
-        health = 200,
-        armor = 100,
-        behavior = "aggressive"
-    }
+    print("^3[Djonluc Evidence Event]^7 Convoy Formation Analysis:")
+    print("^3[Djonluc Evidence Event]^7 Total escort vehicles:", #convoyVehicles)
     
-    local ped = SpawnEscortPed(testPedConfig, targetVehicle, true) -- true = isDriver
+    -- Sort vehicles by X position to show formation
+    local sortedVehicles = {}
+    for i, vehicle in ipairs(convoyVehicles) do
+        if DoesEntityExist(vehicle) then
+            local coords = GetEntityCoords(vehicle)
+            local model = GetEntityModel(vehicle)
+            local modelName = GetDisplayNameFromVehicleModel(model)
+            table.insert(sortedVehicles, {
+                vehicle = vehicle,
+                coords = coords,
+                model = model,
+                modelName = modelName,
+                x = coords.x
+            })
+        end
+    end
     
-    if ped then
-        print("^2[Djonluc Evidence Event]^7 ✅ Test ped spawned successfully:", ped)
-        print("^3[Djonluc Evidence Event]^7 Ped in vehicle:", IsPedInVehicle(ped, targetVehicle, false))
-        print("^3[Djonluc Evidence Event]^7 Ped health:", GetEntityHealth(ped))
-        print("^3[Djonluc Evidence Event]^7 Ped armor:", GetPedArmour(ped))
+    -- Sort by X coordinate to show left-to-right formation
+    table.sort(sortedVehicles, function(a, b) return a.x < b.x end)
+    
+    print("^3[Djonluc Evidence Event]^7 Formation (Left to Right):")
+    for i, vehicleInfo in ipairs(sortedVehicles) do
+        local position = i == 1 and "LEFT" or (i == #sortedVehicles and "RIGHT" or "MIDDLE")
+        print(string.format("^3[Djonluc Evidence Event]^7 %d. %s (%s) at X: %.2f, Y: %.2f, Z: %.2f", 
+            i, position, vehicleInfo.modelName, vehicleInfo.coords.x, vehicleInfo.coords.y, vehicleInfo.coords.z))
+    end
+    
+    -- Check if evidence vehicle exists and its position
+    if eventData and eventData.route and eventData.route.start then
+        local evidencePos = eventData.route.start
+        print("^3[Djonluc Evidence Event]^7 Evidence vehicle spawn point: X: " .. evidencePos.x .. ", Y: " .. evidencePos.y .. ", Z: " .. evidencePos.z)
         
-        -- Add to escort peds table
-        table.insert(_G.escortPeds, ped)
-        print("^3[Djonluc Evidence Event]^7 Ped added to escortPeds table. New count:", #_G.escortPeds)
-    else
-        print("^1[Djonluc Evidence Event]^7 ❌ Failed to spawn test ped")
+        -- Find closest escort vehicle to center
+        local centerX = evidencePos.x
+        local closestVehicle = nil
+        local closestDistance = 999999
+        
+        for _, vehicleInfo in ipairs(sortedVehicles) do
+            local distance = math.abs(vehicleInfo.x - centerX)
+            if distance < closestDistance then
+                closestDistance = distance
+                closestVehicle = vehicleInfo
+            end
+        end
+        
+        if closestVehicle then
+            print("^3[Djonluc Evidence Event]^7 Closest escort vehicle to center: " .. closestVehicle.modelName .. " (distance: " .. string.format("%.2f", closestDistance) .. "m)")
+        end
     end
     
     print("^3[Djonluc Evidence Event]^7 ========================================")
@@ -740,35 +808,27 @@ function SpawnEscortVehicles(startPos, heading)
         return
     end
     
-    -- Spawn escort cars based on config
-    DebugPrint("Spawning escort cars...")
+    -- Calculate total convoy width for proper line formation
+    local totalEscortVehicles = Config.Vehicles.escort_car.count + Config.Vehicles.escort_suv.count
+    local totalWidth = totalEscortVehicles * Config.Vehicles.escort_car.spawn_offset
+    local leftOffset = -totalWidth / 2
+    local rightOffset = totalWidth / 2
+    
+    DebugPrint("Convoy formation: Total vehicles:", totalEscortVehicles, "Total width:", totalWidth, "Left offset:", leftOffset, "Right offset:", rightOffset)
+    
+    -- Spawn escort cars to the RIGHT of center
+    DebugPrint("Spawning escort cars to the RIGHT...")
+    local carIndex = 1
     for i = 1, Config.Vehicles.escort_car.count do
-        local offset = Config.Vehicles.escort_car.spawn_offset * i
-        local direction = Config.Vehicles.escort_car.spawn_direction
+        local offset = leftOffset + (carIndex - 1) * Config.Vehicles.escort_car.spawn_offset
+        local pos = vector3(startPos.x + offset, startPos.y, startPos.z)
         
-        local pos
-        if direction == "right" then
-            pos = vector3(startPos.x + offset, startPos.y, startPos.z)
-        elseif direction == "left" then
-            pos = vector3(startPos.x - offset, startPos.y, startPos.z)
-        elseif direction == "both" then
-            -- Alternate left and right
-            if i % 2 == 1 then
-                pos = vector3(startPos.x + offset, startPos.y, startPos.z)
-            else
-                pos = vector3(startPos.x - offset, startPos.y, startPos.z)
-            end
-        else
-            -- Default to right
-            pos = vector3(startPos.x + offset, startPos.y, startPos.z)
-        end
-        
-        DebugPrint("Spawning escort car", i, "at position:", pos.x, pos.y, pos.z, "direction:", direction)
+        DebugPrint("Spawning escort car", i, "at position:", pos.x, pos.y, pos.z, "offset from center:", offset)
         local vehicle = SpawnVehicle(Config.Vehicles.escort_car.model, pos, heading)
         if vehicle then
             DebugPrint("Escort car", i, "spawned successfully:", vehicle)
             table.insert(convoyVehicles, vehicle)
-            -- Engine is already started in SpawnVehicle function
+            carIndex = carIndex + 1
         else
             DebugPrint("Failed to spawn escort car", i)
         end
@@ -777,35 +837,19 @@ function SpawnEscortVehicles(startPos, heading)
         Citizen.Wait(100)
     end
     
-    -- Spawn escort SUVs based on config
-    DebugPrint("Spawning escort SUVs...")
+    -- Spawn escort SUVs to the LEFT of center
+    DebugPrint("Spawning escort SUVs to the LEFT...")
+    local suvIndex = 1
     for i = 1, Config.Vehicles.escort_suv.count do
-        local offset = Config.Vehicles.escort_suv.spawn_offset * (i + Config.Vehicles.escort_car.count)
-        local direction = Config.Vehicles.escort_suv.spawn_direction
+        local offset = rightOffset - (suvIndex - 1) * Config.Vehicles.escort_suv.spawn_offset
+        local pos = vector3(startPos.x + offset, startPos.y, startPos.z)
         
-        local pos
-        if direction == "right" then
-            pos = vector3(startPos.x + offset, startPos.y, startPos.z)
-        elseif direction == "left" then
-            pos = vector3(startPos.x - offset, startPos.y, startPos.z)
-        elseif direction == "both" then
-            -- Alternate left and right
-            if i % 2 == 1 then
-                pos = vector3(startPos.x + offset, startPos.y, startPos.z)
-            else
-                pos = vector3(startPos.x - offset, startPos.y, startPos.z)
-            end
-        else
-            -- Default to left
-            pos = vector3(startPos.x - offset, startPos.y, startPos.z)
-        end
-        
-        DebugPrint("Spawning escort SUV", i, "at position:", pos.x, pos.y, pos.z, "direction:", direction)
+        DebugPrint("Spawning escort SUV", i, "at position:", pos.x, pos.y, pos.z, "offset from center:", offset)
         local vehicle = SpawnVehicle(Config.Vehicles.escort_suv.model, pos, heading)
         if vehicle then
             DebugPrint("Escort SUV", i, "spawned successfully:", vehicle)
             table.insert(convoyVehicles, vehicle)
-            -- Engine is already started in SpawnVehicle function
+            suvIndex = suvIndex + 1
         else
             DebugPrint("Failed to spawn escort SUV", i)
         end
@@ -814,14 +858,17 @@ function SpawnEscortVehicles(startPos, heading)
         Citizen.Wait(100)
     end
     
-    DebugPrint("Total escort vehicles spawned:", #convoyVehicles - 1) -- -1 for evidence vehicle
-    DebugPrint("Total convoy vehicles (including evidence):", #convoyVehicles)
+    DebugPrint("Total escort vehicles spawned:", #convoyVehicles)
+    DebugPrint("Total convoy vehicles (including evidence):", #convoyVehicles + 1) -- +1 for evidence vehicle
 end
 
 function SpawnEscortPeds(evidenceVehicle)
     DebugPrint("SpawnEscortPeds called, evidenceVehicle:", evidenceVehicle)
     DebugPrint("Current escortPeds count before spawning:", #_G.escortPeds)
     local pedCount = 0
+    
+    -- Clear existing escort peds table
+    _G.escortPeds = {}
     
     -- Get all escort vehicles organized by type
     local escortVehiclesByType = {
@@ -868,7 +915,7 @@ function SpawnEscortPeds(evidenceVehicle)
     DebugPrint("Config escort_cop count:", Config.Peds.escort_cop.count)
     
     for i = 1, Config.Peds.escort_cop.count do
-        local targetVehicle = escortVehiclesByType.escort_car[i] or evidenceVehicle
+        local targetVehicle = escortVehiclesByType.escort_car[i]
         local isDriver = Config.Peds.escort_cop.seat_preference == "driver"
         
         DebugPrint("Attempting to spawn escort cop", i, "in vehicle:", targetVehicle, "isDriver:", isDriver)
@@ -896,7 +943,7 @@ function SpawnEscortPeds(evidenceVehicle)
     DebugPrint("Config escort_swat count:", Config.Peds.escort_swat.count)
     
     for i = 1, Config.Peds.escort_swat.count do
-        local targetVehicle = escortVehiclesByType.escort_suv[i] or evidenceVehicle
+        local targetVehicle = escortVehiclesByType.escort_suv[i]
         local isDriver = Config.Peds.escort_swat.seat_preference == "driver"
         
         DebugPrint("Attempting to spawn escort SWAT", i, "in vehicle:", targetVehicle, "isDriver:", isDriver)

@@ -69,6 +69,7 @@ Config.ConvoyFormation = {
     formation_type = "line", -- "line", "diamond", "wedge", "random"
     spacing = 5.0, -- Distance between vehicles
     max_convoy_width = 20.0, -- Maximum width of convoy formation
+    evidence_center = true, -- Evidence vehicle spawns in center
     escort_positions = {
         front_left = true,
         front_right = true,
