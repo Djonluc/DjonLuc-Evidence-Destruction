@@ -277,3 +277,18 @@ Use these commands to troubleshoot and test the system:
 - `/testenhanced` - Test all enhanced convoy system features
 - `/testnatives` - Test all enhanced FiveM native features
 - `/testnativesvalid` - Verify all FiveM natives work correctly
+
+> **💡 Note**: All test commands are now located in `client/test_commands.lua` for easier maintenance and tracking. The main client file (`client/main.lua`) is clean and focused on core functionality.
+
+## 📁 **File Structure**
+
+The script is organized into logical modules for easier maintenance:
+
+- **`fxmanifest.lua`** - Resource manifest and dependencies
+- **`config.lua`** - All configurable settings
+- **`shared/utils.lua`** - Framework detection and utility functions
+- **`client/main.lua`** - Main client-side logic (clean, no test commands)
+- **`client/test_commands.lua`** - All debug and test commands
+- **`server/main.lua`** - Server-side logic and event management
+- **`QUICK_START.md`** - This quick start guide
+- **`DOCUMENTATION.md`** - Comprehensive documentation
