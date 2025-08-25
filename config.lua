@@ -18,23 +18,23 @@ Config.Vehicles = {
         armor = 1000,
         count = 2,
         livery = 0,
-        spawn_offset = 5.0, -- Distance between escort cars
-        spawn_direction = "right" -- "right", "left", or "both"
+        spawn_offset = 5.0, -- Distance between vehicles in the line
+        spawn_direction = "behind" -- "behind" for single file line formation
     },
     escort_suv = {
         model = "fbi2",
         armor = 1500,
         count = 1,
         livery = 0,
-        spawn_offset = 5.0, -- Distance between escort SUVs
-        spawn_direction = "left" -- "right", "left", or "both"
+        spawn_offset = 5.0, -- Distance between vehicles in the line
+        spawn_direction = "behind" -- "behind" for single file line formation
     },
     evidence_van = {
         model = "stockade",
         armor = 2000,
         count = 1,
         livery = 0,
-        spawn_offset = 0.0 -- Center position
+        spawn_offset = 0.0 -- Front position
     }
 }
 

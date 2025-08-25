@@ -293,12 +293,12 @@ Config.ConvoyMovement = {
 
 ### Convoy Formation
 
-The convoy now spawns in a proper line formation with the evidence vehicle in the center:
+The convoy now spawns in a **single file line formation** with the evidence vehicle at the front:
 
-- **Evidence Vehicle**: Spawns at the center point (spawn coordinates)
-- **Escort Cars**: Spawn to the RIGHT of center with 5.0m spacing
-- **Escort SUVs**: Spawn to the LEFT of center with 5.0m spacing
-- **Formation**: Vehicles maintain optimal spacing for convoy movement
+- **Evidence Vehicle**: Spawns at the front (spawn coordinates)
+- **Escort Cars**: Spawn behind the evidence vehicle with 5.0m spacing
+- **Escort SUVs**: Spawn behind the escort cars with 5.0m spacing
+- **Formation**: Vehicles maintain optimal spacing in a single file line for convoy movement
 
 ### Debug Commands
 

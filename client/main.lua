@@ -146,7 +146,7 @@ RegisterCommand('testformation', function()
     print("^3[Djonluc Evidence Event]^7 Convoy Formation Analysis:")
     print("^3[Djonluc Evidence Event]^7 Total escort vehicles:", #convoyVehicles)
     
-    -- Sort vehicles by X position to show formation
+    -- Sort vehicles by Y position to show front-to-back formation
     local sortedVehicles = {}
     for i, vehicle in ipairs(convoyVehicles) do
         if DoesEntityExist(vehicle) then
@@ -158,17 +158,17 @@ RegisterCommand('testformation', function()
                 coords = coords,
                 model = model,
                 modelName = modelName,
-                x = coords.x
+                y = coords.y
             })
         end
     end
     
-    -- Sort by X coordinate to show left-to-right formation
-    table.sort(sortedVehicles, function(a, b) return a.x < b.x end)
+    -- Sort by Y coordinate to show front-to-back formation (highest Y = front)
+    table.sort(sortedVehicles, function(a, b) return a.y > b.y end)
     
-    print("^3[Djonluc Evidence Event]^7 Formation (Left to Right):")
+    print("^3[Djonluc Evidence Event]^7 Formation (Front to Back):")
     for i, vehicleInfo in ipairs(sortedVehicles) do
-        local position = i == 1 and "LEFT" or (i == #sortedVehicles and "RIGHT" or "MIDDLE")
+        local position = i == 1 and "FRONT" or (i == #sortedVehicles and "BACK" or "MIDDLE")
         print(string.format("^3[Djonluc Evidence Event]^7 %d. %s (%s) at X: %.2f, Y: %.2f, Z: %.2f", 
             i, position, vehicleInfo.modelName, vehicleInfo.coords.x, vehicleInfo.coords.y, vehicleInfo.coords.z))
     end
@@ -179,12 +179,12 @@ RegisterCommand('testformation', function()
         print("^3[Djonluc Evidence Event]^7 Evidence vehicle spawn point: X: " .. evidencePos.x .. ", Y: " .. evidencePos.y .. ", Z: " .. evidencePos.z)
         
         -- Find closest escort vehicle to center
-        local centerX = evidencePos.x
+        local centerY = evidencePos.y
         local closestVehicle = nil
         local closestDistance = 999999
         
         for _, vehicleInfo in ipairs(sortedVehicles) do
-            local distance = math.abs(vehicleInfo.x - centerX)
+            local distance = math.abs(vehicleInfo.y - centerY)
             if distance < closestDistance then
                 closestDistance = distance
                 closestVehicle = vehicleInfo
@@ -808,27 +808,24 @@ function SpawnEscortVehicles(startPos, heading)
         return
     end
     
-    -- Calculate total convoy width for proper line formation
+    -- Calculate convoy formation - vehicles in a single file line behind the evidence vehicle
     local totalEscortVehicles = Config.Vehicles.escort_car.count + Config.Vehicles.escort_suv.count
-    local totalWidth = totalEscortVehicles * Config.Vehicles.escort_car.spawn_offset
-    local leftOffset = -totalWidth / 2
-    local rightOffset = totalWidth / 2
+    local spacing = Config.Vehicles.escort_car.spawn_offset -- Distance between vehicles
     
-    DebugPrint("Convoy formation: Total vehicles:", totalEscortVehicles, "Total width:", totalWidth, "Left offset:", leftOffset, "Right offset:", rightOffset)
+    DebugPrint("Convoy formation: Single file line, Total vehicles:", totalEscortVehicles, "Spacing:", spacing)
     
-    -- Spawn escort cars to the RIGHT of center
-    DebugPrint("Spawning escort cars to the RIGHT...")
-    local carIndex = 1
+    -- Spawn escort cars in a line behind the evidence vehicle
+    DebugPrint("Spawning escort cars in line...")
     for i = 1, Config.Vehicles.escort_car.count do
-        local offset = leftOffset + (carIndex - 1) * Config.Vehicles.escort_car.spawn_offset
-        local pos = vector3(startPos.x + offset, startPos.y, startPos.z)
+        -- Calculate position behind the evidence vehicle
+        local offset = i * spacing
+        local pos = vector3(startPos.x, startPos.y - offset, startPos.z)
         
-        DebugPrint("Spawning escort car", i, "at position:", pos.x, pos.y, pos.z, "offset from center:", offset)
+        DebugPrint("Spawning escort car", i, "at position:", pos.x, pos.y, pos.z, "offset behind center:", offset)
         local vehicle = SpawnVehicle(Config.Vehicles.escort_car.model, pos, heading)
         if vehicle then
             DebugPrint("Escort car", i, "spawned successfully:", vehicle)
             table.insert(convoyVehicles, vehicle)
-            carIndex = carIndex + 1
         else
             DebugPrint("Failed to spawn escort car", i)
         end
@@ -837,19 +834,18 @@ function SpawnEscortVehicles(startPos, heading)
         Citizen.Wait(100)
     end
     
-    -- Spawn escort SUVs to the LEFT of center
-    DebugPrint("Spawning escort SUVs to the LEFT...")
-    local suvIndex = 1
+    -- Spawn escort SUVs in line behind the escort cars
+    DebugPrint("Spawning escort SUVs in line...")
     for i = 1, Config.Vehicles.escort_suv.count do
-        local offset = rightOffset - (suvIndex - 1) * Config.Vehicles.escort_suv.spawn_offset
-        local pos = vector3(startPos.x + offset, startPos.y, startPos.z)
+        -- Calculate position behind the escort cars
+        local offset = (Config.Vehicles.escort_car.count + i) * spacing
+        local pos = vector3(startPos.x, startPos.y - offset, startPos.z)
         
-        DebugPrint("Spawning escort SUV", i, "at position:", pos.x, pos.y, pos.z, "offset from center:", offset)
+        DebugPrint("Spawning escort SUV", i, "at position:", pos.x, pos.y, pos.z, "offset behind center:", offset)
         local vehicle = SpawnVehicle(Config.Vehicles.escort_suv.model, pos, heading)
         if vehicle then
             DebugPrint("Escort SUV", i, "spawned successfully:", vehicle)
             table.insert(convoyVehicles, vehicle)
-            suvIndex = suvIndex + 1
         else
             DebugPrint("Failed to spawn escort SUV", i)
         end
