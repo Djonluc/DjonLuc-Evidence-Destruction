@@ -18,6 +18,119 @@ local function DebugPrint(message, ...)
     print(formattedMessage)
 end
 
+-- Debug command to check vehicle and ped spawning
+RegisterCommand('debugspawn', function()
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^3[Djonluc Evidence Event]^7 🐛 DEBUGGING PED SPAWNING ISSUE")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    
+    -- Check convoy vehicles
+    print("^3[Djonluc Evidence Event]^7 Convoy Vehicles Count:", #convoyVehicles)
+    for i, vehicle in ipairs(convoyVehicles) do
+        if DoesEntityExist(vehicle) then
+            local model = GetEntityModel(vehicle)
+            local modelName = GetDisplayNameFromVehicleModel(model)
+            local coords = GetEntityCoords(vehicle)
+            print("^3[Djonluc Evidence Event]^7 Vehicle " .. i .. ": Model=" .. modelName .. " (" .. model .. ") at " .. coords.x .. ", " .. coords.y .. ", " .. coords.z)
+        else
+            print("^3[Djonluc Evidence Event]^7 Vehicle " .. i .. ": INVALID ENTITY")
+        end
+    end
+    
+    -- Check escort peds
+    print("^3[Djonluc Evidence Event]^7 Escort Peds Count:", #_G.escortPeds)
+    for i, ped in ipairs(_G.escortPeds) do
+        if DoesEntityExist(ped) then
+            local coords = GetEntityCoords(ped)
+            local inVehicle = IsPedInAnyVehicle(ped, false)
+            local vehicle = GetVehiclePedIsIn(ped, false)
+            local vehicleInfo = inVehicle and ("Vehicle: " .. vehicle) or "Not in vehicle"
+            print("^3[Djonluc Evidence Event]^7 Ped " .. i .. ": " .. vehicleInfo .. " at " .. coords.x .. ", " .. coords.y .. ", " .. coords.z)
+        else
+            print("^3[Djonluc Evidence Event]^7 Ped " .. i .. ": INVALID ENTITY")
+        end
+    end
+    
+    -- Check config values
+    print("^3[Djonluc Evidence Event]^7 Config Values:")
+    print("^3[Djonluc Evidence Event]^7   escort_car.model:", Config.Vehicles.escort_car.model)
+    print("^3[Djonluc Evidence Event]^7   escort_car.count:", Config.Vehicles.escort_car.count)
+    print("^3[Djonluc Evidence Event]^7   escort_suv.model:", Config.Vehicles.escort_suv.model)
+    print("^3[Djonluc Evidence Event]^7   escort_suv.count:", Config.Vehicles.escort_suv.count)
+    print("^3[Djonluc Evidence Event]^7   escort_cop.count:", Config.Peds.escort_cop.count)
+    print("^3[Djonluc Evidence Event]^7   escort_swat.count:", Config.Peds.escort_swat.count)
+    
+    -- Check vehicle model hashes
+    local escortCarHash = GetHashKey(Config.Vehicles.escort_car.model)
+    local escortSuvHash = GetHashKey(Config.Vehicles.escort_suv.model)
+    print("^3[Djonluc Evidence Event]^7 Model Hashes:")
+    print("^3[Djonluc Evidence Event]^7   escort_car hash:", escortCarHash)
+    print("^3[Djonluc Evidence Event]^7   escort_suv hash:", escortSuvHash)
+    
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+end, false)
+
+-- Test command to spawn a single ped in a specific vehicle
+RegisterCommand('testpedspawn', function()
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^3[Djonluc Evidence Event]^7 🧪 TESTING SINGLE PED SPAWN")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    
+    if #convoyVehicles == 0 then
+        print("^1[Djonluc Evidence Event]^7 ❌ No convoy vehicles found. Start an event first!")
+        return
+    end
+    
+    -- Find the first escort vehicle
+    local targetVehicle = nil
+    for i, vehicle in ipairs(convoyVehicles) do
+        if DoesEntityExist(vehicle) then
+            local model = GetEntityModel(vehicle)
+            local modelName = GetDisplayNameFromVehicleModel(model)
+            print("^3[Djonluc Evidence Event]^7 Found vehicle " .. i .. ": " .. modelName .. " (" .. model .. ")")
+            
+            -- Use the first non-evidence vehicle
+            if model ~= GetHashKey("stockade") then
+                targetVehicle = vehicle
+                print("^2[Djonluc Evidence Event]^7 ✅ Using vehicle " .. i .. " for ped spawn test")
+                break
+            end
+        end
+    end
+    
+    if not targetVehicle then
+        print("^1[Djonluc Evidence Event]^7 ❌ No suitable escort vehicle found for testing")
+        return
+    end
+    
+    -- Try to spawn a test ped
+    print("^3[Djonluc Evidence Event]^7 Attempting to spawn test ped...")
+    local testPedConfig = {
+        model = "s_m_y_cop_01",
+        weapon = "WEAPON_PISTOL",
+        health = 200,
+        armor = 100,
+        behavior = "aggressive"
+    }
+    
+    local ped = SpawnEscortPed(testPedConfig, targetVehicle, true) -- true = isDriver
+    
+    if ped then
+        print("^2[Djonluc Evidence Event]^7 ✅ Test ped spawned successfully:", ped)
+        print("^3[Djonluc Evidence Event]^7 Ped in vehicle:", IsPedInVehicle(ped, targetVehicle, false))
+        print("^3[Djonluc Evidence Event]^7 Ped health:", GetEntityHealth(ped))
+        print("^3[Djonluc Evidence Event]^7 Ped armor:", GetPedArmour(ped))
+        
+        -- Add to escort peds table
+        table.insert(_G.escortPeds, ped)
+        print("^3[Djonluc Evidence Event]^7 Ped added to escortPeds table. New count:", #_G.escortPeds)
+    else
+        print("^1[Djonluc Evidence Event]^7 ❌ Failed to spawn test ped")
+    end
+    
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+end, false)
+
 -- Make escort peds globally accessible for AI system
 _G.convoyEscortPeds = _G.escortPeds
 
@@ -690,13 +803,29 @@ function SpawnEscortPeds(evidenceVehicle)
         evidence_van = {evidenceVehicle}
     }
     
-    for _, vehicle in ipairs(convoyVehicles) do
+    -- Debug: Show all vehicles and their models
+    DebugPrint("Analyzing convoy vehicles for ped assignment...")
+    for i, vehicle in ipairs(convoyVehicles) do
         if DoesEntityExist(vehicle) and vehicle ~= evidenceVehicle then
             local model = GetEntityModel(vehicle)
-            if model == GetHashKey(Config.Vehicles.escort_car.model) then
+            local modelName = GetDisplayNameFromVehicleModel(model)
+            local expectedCarHash = GetHashKey(Config.Vehicles.escort_car.model)
+            local expectedSuvHash = GetHashKey(Config.Vehicles.escort_suv.model)
+            
+            DebugPrint("Vehicle " .. i .. ": Model=" .. modelName .. " (" .. model .. ")")
+            DebugPrint("  Expected escort_car hash: " .. expectedCarHash)
+            DebugPrint("  Expected escort_suv hash: " .. expectedSuvHash)
+            DebugPrint("  Is escort_car: " .. tostring(model == expectedCarHash))
+            DebugPrint("  Is escort_suv: " .. tostring(model == expectedSuvHash))
+            
+            if model == expectedCarHash then
                 table.insert(escortVehiclesByType.escort_car, vehicle)
-            elseif model == GetHashKey(Config.Vehicles.escort_suv.model) then
+                DebugPrint("  -> Assigned to escort_car")
+            elseif model == expectedSuvHash then
                 table.insert(escortVehiclesByType.escort_suv, vehicle)
+                DebugPrint("  -> Assigned to escort_suv")
+            else
+                DebugPrint("  -> UNKNOWN TYPE - not assigned to any category")
             end
         end
     end
@@ -708,19 +837,26 @@ function SpawnEscortPeds(evidenceVehicle)
     
     -- Spawn escort cops and assign to escort cars
     DebugPrint("Spawning escort cops...")
+    DebugPrint("Available escort_car vehicles:", #escortVehiclesByType.escort_car)
+    DebugPrint("Config escort_cop count:", Config.Peds.escort_cop.count)
+    
     for i = 1, Config.Peds.escort_cop.count do
         local targetVehicle = escortVehiclesByType.escort_car[i] or evidenceVehicle
         local isDriver = Config.Peds.escort_cop.seat_preference == "driver"
         
         DebugPrint("Attempting to spawn escort cop", i, "in vehicle:", targetVehicle, "isDriver:", isDriver)
-        local ped = SpawnEscortPed(Config.Peds.escort_cop, targetVehicle, isDriver)
-        if ped then
-            DebugPrint("Escort cop", i, "spawned successfully:", ped, "in vehicle:", targetVehicle)
-            table.insert(_G.escortPeds, ped)
-            pedCount = pedCount + 1
-            DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+        if targetVehicle and DoesEntityExist(targetVehicle) then
+            local ped = SpawnEscortPed(Config.Peds.escort_cop, targetVehicle, isDriver)
+            if ped then
+                DebugPrint("Escort cop", i, "spawned successfully:", ped, "in vehicle:", targetVehicle)
+                table.insert(_G.escortPeds, ped)
+                pedCount = pedCount + 1
+                DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+            else
+                DebugPrint("Failed to spawn escort cop", i)
+            end
         else
-            DebugPrint("Failed to spawn escort cop", i)
+            DebugPrint("ERROR: Target vehicle for escort cop", i, "is invalid or doesn't exist")
         end
         
         -- Wait between spawning peds to prevent interference
@@ -729,19 +865,26 @@ function SpawnEscortPeds(evidenceVehicle)
     
     -- Spawn escort SWAT and assign to escort SUVs
     DebugPrint("Spawning escort SWAT...")
+    DebugPrint("Available escort_suv vehicles:", #escortVehiclesByType.escort_suv)
+    DebugPrint("Config escort_swat count:", Config.Peds.escort_swat.count)
+    
     for i = 1, Config.Peds.escort_swat.count do
         local targetVehicle = escortVehiclesByType.escort_suv[i] or evidenceVehicle
         local isDriver = Config.Peds.escort_swat.seat_preference == "driver"
         
         DebugPrint("Attempting to spawn escort SWAT", i, "in vehicle:", targetVehicle, "isDriver:", isDriver)
-        local ped = SpawnEscortPed(Config.Peds.escort_swat, targetVehicle, isDriver)
-        if ped then
-            DebugPrint("Escort SWAT", i, "spawned successfully:", ped, "in vehicle:", targetVehicle)
-            table.insert(_G.escortPeds, ped)
-            pedCount = pedCount + 1
-            DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+        if targetVehicle and DoesEntityExist(targetVehicle) then
+            local ped = SpawnEscortPed(Config.Peds.escort_swat, targetVehicle, isDriver)
+            if ped then
+                DebugPrint("Escort SWAT", i, "spawned successfully:", ped, "in vehicle:", targetVehicle)
+                table.insert(_G.escortPeds, ped)
+                pedCount = pedCount + 1
+                DebugPrint("Ped added to global escortPeds table. New count:", #_G.escortPeds)
+            else
+                DebugPrint("Failed to spawn escort SWAT", i)
+            end
         else
-            DebugPrint("Failed to spawn escort SWAT", i)
+            DebugPrint("ERROR: Target vehicle for escort SWAT", i, "is invalid or doesn't exist")
         end
         
         -- Wait between spawning peds to prevent interference
