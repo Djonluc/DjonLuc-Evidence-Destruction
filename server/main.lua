@@ -531,18 +531,7 @@ RegisterCommand('convoyroute', function(source, args, rawCommand)
     end
 end, false)
 
--- Test ox_lib functionality
-RegisterCommand('test_oxlib', function(source, args, rawCommand)
-    if source == 0 then -- Console only
-        if Utils.PrintOxLibStatus then
-            Utils.PrintOxLibStatus()
-        else
-            print("^1[Djonluc Evidence Event]^7 ERROR: PrintOxLibStatus function not available")
-        end
-    else
-        TriggerClientEvent('djonluc_evidence_event:showNotification', source, 'This command is console-only')
-    end
-end, false)
+
 
 -- Check if player has required job
 RegisterCommand('checkjob', function(source, args, rawCommand)
