@@ -260,10 +260,10 @@ start = vector4(-1037.89, -2738.56, 20.17, 327.0)
 
 ### **🚗 Enhanced Vehicle Formation**
 
-- **Smart Following**: Uses `SetVehicleFollowToEntity` for natural convoy movement
-- **Formation Maintenance**: `SetVehicleFormation` keeps vehicles in proper spacing
+- **Smart Following**: Uses `TaskVehicleDriveToCoordLongrange` for natural convoy movement
+- **Formation Maintenance**: Continuous formation monitoring and correction
 - **Enhanced Movement**: Better driving tasks and convoy coordination
-- **Mission Entity Management**: Proper entity handling for stability
+- **Mission Entity Management**: Proper entity handling for stability using `SetEntityAsMissionEntity`
 
 ### Debug Commands
 
@@ -276,3 +276,4 @@ Use these commands to troubleshoot and test the system:
 - `/testcoords` - Check vehicle coordinates and spawn points
 - `/testenhanced` - Test all enhanced convoy system features
 - `/testnatives` - Test all enhanced FiveM native features
+- `/testnativesvalid` - Verify all FiveM natives work correctly

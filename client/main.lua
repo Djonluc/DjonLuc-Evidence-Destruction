@@ -902,6 +902,9 @@ function SpawnConvoy(route)
         -- Start enhanced convoy movement
         EnhancedConvoyMovement()
         
+        -- Start continuous formation maintenance
+        StartConvoyFormationMaintenance()
+        
         -- Apply enhanced visual effects
         CreateEnhancedBlipEffects()
     else
@@ -2174,10 +2177,8 @@ local function SetupVehicleFormation()
         local escortVehicle = convoyVehicles[i]
         if DoesEntityExist(escortVehicle) then
             -- Set vehicle to follow the evidence vehicle with proper spacing
-            SetVehicleFollowToEntity(escortVehicle, evidenceVehicle, 20.0, 1, 5.0)
-            
-            -- Set vehicle formation properties
-            SetVehicleFormation(escortVehicle, 1) -- Formation type 1 = follow
+            -- Note: SetVehicleFollowToEntity doesn't exist in FiveM, using alternative approach
+            -- SetVehicleFormation doesn't exist in FiveM, using alternative approach
             
             -- Ensure vehicle stays running
             SetVehicleEngineOn(escortVehicle, true, true, false)
@@ -2185,14 +2186,14 @@ local function SetupVehicleFormation()
             -- Set vehicle to mission entity for better management
             SetEntityAsMissionEntity(escortVehicle, true, true)
             
-            DebugPrint("Vehicle", i, "configured for formation following")
+            DebugPrint("Vehicle", i, "configured for formation following (using alternative method)")
         end
     end
     
     DebugPrint("Enhanced vehicle formation setup completed")
 end
 
--- Enhanced convoy movement with formation maintenance
+-- Enhanced convoy movement with formation maintenance using valid FiveM natives
 local function EnhancedConvoyMovement()
     if #convoyVehicles < 2 then
         return
@@ -2216,10 +2217,29 @@ local function EnhancedConvoyMovement()
         SetDriverAggressiveness(evidenceVehicle, 0.2) -- Low aggression for smooth convoy leading
         
         DebugPrint("Evidence vehicle set to drive to destination with enhanced movement")
+        
+        -- Set escort vehicles to follow using valid FiveM natives
+        for i = 2, #convoyVehicles do
+            local escortVehicle = convoyVehicles[i]
+            if DoesEntityExist(escortVehicle) then
+                -- Calculate follow position behind the evidence vehicle
+                local evidenceCoords = GetEntityCoords(evidenceVehicle)
+                local followDistance = (i - 1) * 5.0 -- 5m spacing between vehicles
+                
+                -- Set escort vehicle to drive to a point behind the evidence vehicle
+                local followPoint = vector3(evidenceCoords.x, evidenceCoords.y - followDistance, evidenceCoords.z)
+                TaskVehicleDriveToCoordLongrange(escortVehicle, followPoint.x, followPoint.y, followPoint.z, speed * 0.9, 786603, 5.0)
+                
+                -- Set driving attributes for escort vehicles
+                SetDriverAbility(escortVehicle, 0.8)
+                SetDriverAggressiveness(escortVehicle, 0.1) -- Very low aggression for smooth following
+                
+                DebugPrint("Escort vehicle", i, "set to follow at distance:", followDistance)
+            end
+        end
     end
     
-    -- Escort vehicles automatically follow due to formation setup
-    DebugPrint("Escort vehicles following evidence vehicle in formation")
+    DebugPrint("Enhanced convoy movement setup completed using valid FiveM natives")
 end
 
 -- Enhanced ped combat and AI system
@@ -2230,23 +2250,24 @@ local function SetupEnhancedPedAI(ped, pedConfig)
     
     DebugPrint("Setting up enhanced AI for ped:", ped)
     
-    -- Enhanced combat attributes for realistic behavior
+    -- Enhanced combat attributes for realistic behavior (using valid FiveM natives)
     SetPedCombatAttributes(ped, 46, true)  -- Can use cover
     SetPedCombatAttributes(ped, 5, true)   -- Can fight armed peds
     SetPedCombatAttributes(ped, 17, true)  -- Can use group tactics
     SetPedCombatAttributes(ped, 2, true)   -- Can use vehicles
     SetPedCombatAttributes(ped, 1, true)   -- Can fight armed peds when not armed
     SetPedCombatAttributes(ped, 0, true)   -- Can use cover
-    SetPedCombatAttributes(ped, 1424, true) -- Can use advanced tactics
+    
+    -- Note: SetPedCombatAttributes 1424 doesn't exist in FiveM, removed
     
     -- Enhanced combat range and accuracy
     SetPedCombatRange(ped, 2) -- Medium range combat
     SetPedAccuracy(ped, 85)   -- High accuracy for professional escorts
     
-    -- Enhanced combat ability and movement
+    -- Enhanced combat ability
     SetPedCombatAbility(ped, 100)      -- Maximum combat ability
-    SetPedCombatMovement(ped, 3)       -- Combat movement type 3 = tactical
-    SetPedCombatRange(ped, 2)          -- Combat range 2 = medium
+    
+    -- Note: SetPedCombatMovement doesn't exist in FiveM, removed
     
     -- Set ped to not flee and maintain position
     SetPedFleeAttributes(ped, 0, false)
@@ -2302,20 +2323,18 @@ local function SetupEscortBehavior(ped, vehicle)
     -- Set ped to enhanced patrol behavior
     TaskGoToCoordAnyMeans(ped, patrolPoints[1].x, patrolPoints[1].y, patrolPoints[1].z, 2.0, 0, false, 786603, 0)
     
-    -- Set ped to look for threats while patrolling
-    SetPedCombatAttributes(ped, 1424, true) -- Advanced threat detection
+    -- Note: SetPedCombatAttributes 1424 doesn't exist in FiveM, removed
     
     DebugPrint("Enhanced escort behavior setup completed for ped:", ped)
     return true
 end
 
--- Enhanced visual effects and blip polish
+-- Enhanced visual effects and blip polish using valid FiveM natives
 local function CreateEnhancedBlipEffects()
     -- Enhanced main convoy blip with better visual effects
     if convoyBlip and DoesBlipExist(convoyBlip) then
         -- Set blip to flash when convoy is active
         SetBlipFlashes(convoyBlip, true)
-        SetBlipFlashInterval(convoyBlip, 1000) -- Flash every second
         
         -- Set blip to short range for better performance
         SetBlipAsShortRange(convoyBlip, true)
@@ -2334,7 +2353,6 @@ local function CreateEnhancedBlipEffects()
             
             -- Add subtle flashing to vehicle blips
             SetBlipFlashes(blip, true)
-            SetBlipFlashInterval(blip, 2000) -- Flash every 2 seconds
             
             DebugPrint("Enhanced vehicle blip effects applied")
         end
@@ -2344,7 +2362,6 @@ local function CreateEnhancedBlipEffects()
     if convoyBlips.protectionZone and DoesBlipExist(convoyBlips.protectionZone) then
         -- Set protection zone to pulse effect
         SetBlipFlashes(convoyBlips.protectionZone, true)
-        SetBlipFlashInterval(convoyBlips.protectionZone, 500) -- Flash every 0.5 seconds
         
         -- Make protection zone more visible
         SetBlipAlpha(convoyBlips.protectionZone, 180) -- More opaque
@@ -2406,13 +2423,11 @@ local function UpdateEnhancedConvoyStatus()
         statusColor = 1 -- Red
         -- Fast flashing for critical status
         SetBlipFlashes(convoyBlips.statusIndicator, true)
-        SetBlipFlashInterval(convoyBlips.statusIndicator, 200)
     elseif isUnderAttack then
         status = "UNDER ATTACK"
         statusColor = 1 -- Red
         -- Medium flashing for attack status
         SetBlipFlashes(convoyBlips.statusIndicator, true)
-        SetBlipFlashInterval(convoyBlips.statusIndicator, 500)
     else
         status = "ACTIVE"
         statusColor = 2 -- Green
@@ -2432,7 +2447,6 @@ local function UpdateEnhancedConvoyStatus()
             -- Make protection zone more prominent when under attack
             SetBlipAlpha(convoyBlips.protectionZone, 255)
             SetBlipFlashes(convoyBlips.protectionZone, true)
-            SetBlipFlashInterval(convoyBlips.protectionZone, 300)
         else
             -- Normal protection zone appearance
             SetBlipAlpha(convoyBlips.protectionZone, 128)
@@ -2521,5 +2535,175 @@ RegisterCommand('testnatives', function()
     
     print("^3[Djonluc Evidence Event]^7 ========================================")
     print("^2[Djonluc Evidence Event]^7 🎉 All enhanced FiveM native tests completed!")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+end, false)
+
+-- Continuous convoy formation maintenance using valid FiveM natives
+local function StartConvoyFormationMaintenance()
+    Citizen.CreateThread(function()
+        DebugPrint("Starting convoy formation maintenance thread")
+        
+        while eventActive and #convoyVehicles >= 2 do
+            Citizen.Wait(3000) -- Update formation every 3 seconds
+            
+            local evidenceVehicle = convoyVehicles[1]
+            if not DoesEntityExist(evidenceVehicle) then
+                break
+            end
+            
+            local evidenceCoords = GetEntityCoords(evidenceVehicle)
+            local speed = Config.ConvoyMovement.speed or 20.0
+            
+            -- Maintain formation for escort vehicles
+            for i = 2, #convoyVehicles do
+                local escortVehicle = convoyVehicles[i]
+                if DoesEntityExist(escortVehicle) then
+                    -- Calculate desired follow position
+                    local followDistance = (i - 1) * 5.0
+                    local followPoint = vector3(evidenceCoords.x, evidenceCoords.y - followDistance, evidenceCoords.z)
+                    
+                    -- Check if vehicle is too far from formation
+                    local escortCoords = GetEntityCoords(escortVehicle)
+                    local distanceFromFormation = #(escortCoords - followPoint)
+                    
+                    if distanceFromFormation > 10.0 then -- If more than 10m from formation
+                        DebugPrint("Escort vehicle", i, "correcting formation position")
+                        
+                        -- Re-issue driving task to correct position
+                        TaskVehicleDriveToCoordLongrange(escortVehicle, followPoint.x, followPoint.y, followPoint.z, speed * 0.9, 786603, 5.0)
+                        
+                        -- Ensure vehicle stays in formation
+                        SetDriverAbility(escortVehicle, 0.8)
+                        SetDriverAggressiveness(escortVehicle, 0.1)
+                    end
+                end
+            end
+        end
+        
+        DebugPrint("Convoy formation maintenance thread ended")
+    end)
+end
+
+-- Test command to verify all FiveM natives work correctly
+RegisterCommand('testnativesvalid', function()
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^3[Djonluc Evidence Event]^7 ✅ TESTING VALID FIVEM NATIVES")
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    
+    print("^3[Djonluc Evidence Event]^7 Testing FiveM Native Functions:")
+    
+    -- Test entity management natives
+    print("^3[Djonluc Evidence Event]^7 🏗️ Entity Management Natives:")
+    local testEntity = PlayerPedId()
+    if testEntity then
+        local success = pcall(function()
+            SetEntityAsMissionEntity(testEntity, true, true)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetEntityAsMissionEntity:", success and "✅ PASS" or "❌ FAIL")
+        
+        local success2 = pcall(function()
+            SetEntityInvincible(testEntity, false)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetEntityInvincible:", success2 and "✅ PASS" or "❌ FAIL")
+    end
+    
+    -- Test vehicle natives
+    print("^3[Djonluc Evidence Event]^7 🚗 Vehicle Natives:")
+    local testVehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if testVehicle and testVehicle ~= 0 then
+        local success = pcall(function()
+            SetVehicleEngineOn(testVehicle, true, true, false)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetVehicleEngineOn:", success and "✅ PASS" or "❌ FAIL")
+        
+        local success2 = pcall(function()
+            SetDriverAbility(testVehicle, 1.0)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetDriverAbility:", success2 and "✅ PASS" or "❌ FAIL")
+        
+        local success3 = pcall(function()
+            SetDriverAggressiveness(testVehicle, 0.5)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetDriverAggressiveness:", success3 and "✅ PASS" or "❌ FAIL")
+    else
+        print("^3[Djonluc Evidence Event]^7   Vehicle natives: ⚠️ No vehicle to test")
+    end
+    
+    -- Test ped natives
+    print("^3[Djonluc Evidence Event]^7 🧍 Ped Natives:")
+    local testPed = PlayerPedId()
+    if testPed then
+        local success = pcall(function()
+            SetPedCombatAttributes(testPed, 46, true)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetPedCombatAttributes:", success and "✅ PASS" or "❌ FAIL")
+        
+        local success2 = pcall(function()
+            SetPedCombatRange(testPed, 2)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetPedCombatRange:", success2 and "✅ PASS" or "❌ FAIL")
+        
+        local success3 = pcall(function()
+            SetPedAccuracy(testPed, 85)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetPedAccuracy:", success3 and "✅ PASS" or "❌ FAIL")
+        
+        local success4 = pcall(function()
+            SetPedCombatAbility(testPed, 100)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetPedCombatAbility:", success4 and "✅ PASS" or "❌ FAIL")
+        
+        local success5 = pcall(function()
+            SetPedFleeAttributes(testPed, 0, false)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetPedFleeAttributes:", success5 and "✅ PASS" or "❌ FAIL")
+    end
+    
+    -- Test blip natives
+    print("^3[Djonluc Evidence Event]^7 📍 Blip Natives:")
+    local testBlip = AddBlipForCoord(0, 0, 0)
+    if testBlip then
+        local success = pcall(function()
+            SetBlipFlashes(testBlip, true)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetBlipFlashes:", success and "✅ PASS" or "❌ FAIL")
+        
+        local success2 = pcall(function()
+            SetBlipAsShortRange(testBlip, true)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetBlipAsShortRange:", success2 and "✅ PASS" or "❌ FAIL")
+        
+        local success3 = pcall(function()
+            SetBlipRotation(testBlip, 45)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetBlipRotation:", success3 and "✅ PASS" or "❌ FAIL")
+        
+        local success4 = pcall(function()
+            SetBlipAlpha(testBlip, 128)
+        end)
+        print("^3[Djonluc Evidence Event]^7   SetBlipAlpha:", success4 and "✅ PASS" or "❌ FAIL")
+        
+        -- Clean up test blip
+        RemoveBlip(testBlip)
+        print("^3[Djonluc Evidence Event]^7   Test blip cleaned up")
+    end
+    
+    -- Test task natives
+    print("^3[Djonluc Evidence Event]^7 🎯 Task Natives:")
+    local testPed = PlayerPedId()
+    if testPed then
+        local success = pcall(function()
+            ClearPedTasksImmediately(testPed)
+        end)
+        print("^3[Djonluc Evidence Event]^7   ClearPedTasksImmediately:", success and "✅ PASS" or "❌ FAIL")
+        
+        local success2 = pcall(function()
+            TaskGoToCoordAnyMeans(testPed, 0, 0, 0, 2.0, 0, false, 786603, 0)
+        end)
+        print("^3[Djonluc Evidence Event]^7   TaskGoToCoordAnyMeans:", success2 and "✅ PASS" or "❌ FAIL")
+    end
+    
+    print("^3[Djonluc Evidence Event]^7 ========================================")
+    print("^2[Djonluc Evidence Event]^7 🎉 All valid FiveM native tests completed!")
     print("^3[Djonluc Evidence Event]^7 ========================================")
 end, false)
