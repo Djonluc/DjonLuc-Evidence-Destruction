@@ -196,7 +196,7 @@ DjonLuc-Evidence-Destruction/
 ## 🆘 Support
 
 ### Discord
-**[Join the Community](https://discord.gg/k47HCwRCAJ)** — Support, updates, and feature requests.
+**[Join the Community](https://discord.gg/s7GPUHWrS7)** — Support, updates, and feature requests.
 
 ### Troubleshooting
 1. Run `/convoydebug` to check entity states
@@ -212,7 +212,7 @@ DjonLuc-Evidence-Destruction/
   <img src="https://img.shields.io/badge/DjonStNix-Official-blue?style=for-the-badge" alt="DjonStNix Official" />
 </p>
 
-**Djon StNix** — Software Developer & Digital Creator
+**DjonStNix** — Software Developer & Digital Creator
 
 | Platform | Link |
 |----------|------|
@@ -220,16 +220,16 @@ DjonLuc-Evidence-Destruction/
 | 📧 Email | [djonstnix@gmail.com](mailto:djonstnix@gmail.com) |
 | 🎬 YouTube | [@Djonluc](https://www.youtube.com/@Djonluc) |
 | 📸 Instagram | [@Djonluc](https://www.instagram.com/Djonluc) |
-| 💬 Discord | [Community Server](https://discord.gg/k47HCwRCAJ) |
+| 💬 Discord | [Community Server](https://discord.gg/s7GPUHWrS7) |
 
 ---
 
 ## 📝 License
 
-This project is developed by **Djon StNix** for the FiveM community.
+This project is developed by **DjonStNix** for the FiveM community.
 Attribution is required when using or modifying this script.
 
-© 2026 Djon StNix — All rights reserved.
+© 2026 DjonStNix — All rights reserved.
 
 ---
 
