@@ -9,88 +9,84 @@ Config.Debug = {
 ---------------------------------------------------------------------
 -- ROUTE SETTINGS
 ---------------------------------------------------------------------
-
--- Starting point of convoy
 Config.Route = {
-    Start = vector4(104.48, -998.14, 29.4, 337.34),
-    Destination = vector4(-398.21, 132.82, 65.43, 88.54),
-    DriveSpeed = 25.0
+    Start = vector4(503.31, -1019.22, 28.06, 358.57), -- Where the Lead Bikes spawn (Front of convoy)
+    Destination = vector4(-1693.0, 3007.2, 32.99, 7.62), -- The final goal for the secure van
+    DriveSpeed = 35.0, -- Default speed (MPH).
+    
+    -- Driving Style: 
+    -- 786603 (Default: Rushed, avoids traffic but stops at lights)
+    -- 1074528293 (Aggressive SWAT: IGNORES traffic, stops for nothing)
+    DrivingStyle = 1074528293 
 }
 
 ---------------------------------------------------------------------
 -- VEHICLE SETTINGS
 ---------------------------------------------------------------------
-
--- You can use ANY vehicle model (addon compatible)
-Config.Vehicles = {
-
-    Van = {
-        model = "stockade",
-        engineOnSpawn = true,
-        locked = true,
-        bulletproofTires = true,
-        livery = 0,
-        extras = {},
-        health = 6000
+Config.Formation = {
+    Bikes = {
+        { model = "policeb", seats = 1 }, -- Primary front scouts
+        { model = "policeb", seats = 1 }  
     },
 
-    Escorts = {
-        {
-            model = "police3",
-            seats = 4,
-            bulletproofTires = true
-        },
-        {
-            model = "police4",
-            seats = 4,
-            bulletproofTires = true
-        },
-        {
-            model = "fbi2",
-            seats = 4,
-            bulletproofTires = true
-        }
+    Patrol = {
+        model = "police3", -- Secondary lead vehicle
+        seats = 2
+    },
+
+    SUV = {
+        model = "fbi", -- Middle security SUV
+        seats = 4
+    },
+
+    Van = {
+        model = "riot", -- Switched to Armored Riot for emergency pathing
+        health = 12000, -- Buffed HP
+        bulletproofTires = true,
+        engineOnSpawn = true,
+        locked = true -- Keeps peds inside and players out until destroyed
+    },
+
+    Rear = {
+        model = "fbi2", -- Tailgate security
+        seats = 4
     }
 }
 
 ---------------------------------------------------------------------
 -- PED SETTINGS
 ---------------------------------------------------------------------
-
 Config.Peds = {
-
     Driver = {
         model = "s_m_y_swat_01",
-        weapon = "WEAPON_CARBINERIFLE",
-        accuracy = 65,
-        armor = 150
+        weapon = "WEAPON_MICROSMG", -- Recommended for drive-bys
+        accuracy = 95, -- Buffed for tactical difficulty
+        armor = 200 -- Super armor
     },
 
     Guard = {
         model = "s_m_y_swat_01",
-        weapon = "WEAPON_CARBINERIFLE",
-        accuracy = 60,
-        armor = 150
+        weapon = "WEAPON_MICROSMG",
+        accuracy = 90,
+        armor = 200
     }
 }
 
 ---------------------------------------------------------------------
 -- AI BEHAVIOR SETTINGS
 ---------------------------------------------------------------------
-
 Config.AI = {
-    CombatMovement = 2,
-    CombatRange = 2,
-    AlwaysFight = true,
-    ExitOnAttack = true
+    CombatMovement = 1, -- 1: Advance (Aggressive), 2: Defensive (Stay near car)
+    CombatRange = 2,    -- 1: Short, 2: Medium (Hard AI), 3: Long
+    AlwaysFight = true, -- If true, guards will never surrender or flee
+    ExitOnAttack = true -- If true, guards exit vehicle when the van is stopped/stuck under fire
 }
 
 ---------------------------------------------------------------------
 -- LAW PROTECTION SETTINGS
 ---------------------------------------------------------------------
-
 Config.LawProtection = {
-    Enabled = true,
+    Enabled = true, -- If true, listed jobs are ignored by the convoy's aggression
     Jobs = {
         police = true,
         sheriff = true,
@@ -103,25 +99,28 @@ Config.LawProtection = {
 ---------------------------------------------------------------------
 -- EVENT SETTINGS
 ---------------------------------------------------------------------
-
 Config.Event = {
-    Cooldown = 1800,
-    Timeout = 1800,
-    LootDistance = 5.0,
-    AdaptiveDifficulty = false,
-    EnableBackup = false,
-    EnableHeliSupport = false
+    StartDelay = 5,  -- Increased to 5s to allow formation to settle
+    Cooldown = 1800, -- Secondary event cooldown (Seconds)
+    Timeout = 1800,  -- Time before convoy automatically cleans up if not finished
+    LootDistance = 5.0, -- Distance a player must be to the destroyed van to loot
+    
+    -- AdaptiveDifficulty: [EXPERIMENTAL]
+    -- Scales guard accuracy and health based on player count nearby.
+    AdaptiveDifficulty = false, 
+    
+    EnableBackup = false, -- [FUTURE] Calls more police units if van is under 50% HP
+    EnableHeliSupport = false -- [FUTURE] Spawns a patrol helicopter
 }
 
 ---------------------------------------------------------------------
 -- LOOT SETTINGS
 ---------------------------------------------------------------------
-
 Config.Loot = {
     {
-        item = "cokebrick",
-        min = 2,
-        max = 5
+        item = "cokebrick", -- The technical item name
+        min = 2, -- Minimum count
+        max = 5  -- Maximum count
     },
     {
         item = "goldbar",

@@ -31,12 +31,27 @@ RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, se
         if DoesEntityExist(ped) then
             SetPedRelationshipGroupHash(ped, ConvoyGroupHash)
             SetPedAccuracy(ped, accuracy or 60)
-            SetPedCombatAttributes(ped, 46, Config.AI.AlwaysFight)
-            SetPedCombatMovement(ped, Config.AI.CombatMovement)
-            SetPedCombatRange(ped, Config.AI.CombatRange)
-            SetPedAsCop(ped, true)
+            
+            -- Hard Aggression: Never surrender, Never flee
+            SetBlockingOfNonTemporaryEvents(ped, true)
             SetPedFleeAttributes(ped, 0, false)
+            SetPedConfigFlag(ped, 100, true)  -- CPED_CONFIG_FLAG_BlocksPedsDuringVehicleJack
+            SetPedConfigFlag(ped, 118, false) -- CPED_CONFIG_FLAG_CanPutHandsUp (Disable)
+            SetPedConfigFlag(ped, 208, true)  -- CPED_CONFIG_FLAG_DisablePanicInVehicle
+            
+            SetPedCombatAttributes(ped, 46, Config.AI.AlwaysFight)
+            SetPedCombatAttributes(ped, 5, true)   -- CanFightArmedPedsWhenNotArmed
+            SetPedCombatAttributes(ped, 0, true)   -- CanUseCover
+            SetPedCombatAttributes(ped, 52, true)  -- ForceTargetPedsInVehicles
+            SetPedCombatAttributes(ped, 17, false) -- Never Flee
+            SetPedCombatAttributes(ped, 4, true)   -- BF_CanDriveBy
+            SetPedCombatAttributes(ped, 2, true)   -- BF_CanDoDrivebys
+            
+            SetPedCombatMovement(ped, Config.AI.CombatMovement or 1)
+            SetPedCombatRange(ped, Config.AI.CombatRange or 2)
+            SetPedAsCop(ped, true)
             SetEntityAsMissionEntity(ped, true, true)
+            SetPedCanBeTargetted(ped, true) -- Correct native for targeting
             
             SetNetworkIdExistsOnAllMachines(pedNetId, true)
             SetNetworkIdCanMigrate(pedNetId, false)
@@ -83,7 +98,7 @@ CreateThread(function()
             if isConvoyVeh then
                 -- 1. Damage check
                 if HasEntityBeenDamagedByAnyPed(entity) then
-                    local attacker = GetPedSourceOfDamage(entity)
+                    local attacker = GetEntityLastDamageEntity(entity)
                     if IsPedAPlayer(attacker) then
                         TriggerServerEvent("djonluc:server:markHostile", GetPlayerServerId(NetworkGetPlayerIndexFromPed(attacker)))
                     end
@@ -103,9 +118,9 @@ CreateThread(function()
 
         -- Check Guards for damage
         for _, ped in ipairs(GetGamePool("CPed")) do
-            if IsPedInRelationshipGroup(ped, ConvoyGroupHash) then
+            if GetPedRelationshipGroupHash(ped) == ConvoyGroupHash then
                 if HasEntityBeenDamagedByAnyPed(ped) then
-                    local attacker = GetPedSourceOfDamage(ped)
+                    local attacker = GetEntityLastDamageEntity(ped)
                     if IsPedAPlayer(attacker) then
                         TriggerServerEvent("djonluc:server:markHostile", GetPlayerServerId(NetworkGetPlayerIndexFromPed(attacker)))
                     end
@@ -143,7 +158,7 @@ CreateThread(function()
         local escalationTriggered = (ConvoyState == "DEFENSIVE")
 
         for _, guard in ipairs(GetGamePool("CPed")) do
-            if IsPedInRelationshipGroup(guard, ConvoyGroupHash) then
+            if GetPedRelationshipGroupHash(guard) == ConvoyGroupHash then
                 local guardCoords = GetEntityCoords(guard)
                 
                 -- Draw weapon if in ALERT or higher
@@ -155,7 +170,6 @@ CreateThread(function()
                         end
                     end
                 else
-                    -- CALM state: Holster weapon
                     if IsPedArmed(guard, 7) then
                         SetCurrentPedWeapon(guard, joaat("WEAPON_UNARMED"), true)
                         ClearPedTasks(guard)
@@ -171,14 +185,14 @@ CreateThread(function()
                             local targetPed = GetPlayerPed(player)
                             local dist = #(guardCoords - GetEntityCoords(targetPed))
                             
-                            if dist < 100.0 then
+                            if dist < 120.0 then
                                 hasTarget = true
-                                -- Defensive logic: Exit vehicle if hostile is close
-                                if IsPedInAnyVehicle(guard, false) and (dist < 40.0 or escalationTriggered) then
-                                    TaskLeaveVehicle(guard, GetVehiclePedIsIn(guard, false), 256)
-                                end
-
-                                if not IsPedInAnyVehicle(guard, false) then
+                                if IsPedInAnyVehicle(guard, false) then
+                                    -- Logic: Exit if attacked or hostile is close
+                                    if escalationTriggered or dist < 60.0 then
+                                        TaskLeaveVehicle(guard, GetVehiclePedIsIn(guard, false), 256)
+                                    end
+                                else
                                     TaskCombatPed(guard, targetPed, 0, 16)
                                 end
                             end
@@ -186,11 +200,8 @@ CreateThread(function()
                     end
                 end
 
-                -- If no hostiles or in CALM, return to neutral/idle
-                if not hasTarget and not IsPedInAnyVehicle(guard, false) then
-                    if ConvoyState == "CALM" then
-                        ClearPedTasks(guard)
-                    end
+                if not hasTarget and not IsPedInAnyVehicle(guard, false) and ConvoyState == "CALM" then
+                    ClearPedTasks(guard)
                 end
             end
         end

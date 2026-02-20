@@ -30,7 +30,7 @@ RegisterNetEvent("djonluc:client:startBlips", function(netId)
         while DoesEntityExist(vehicle) do
             Wait(1000)
             local health = GetEntityHealth(vehicle)
-            local maxHealth = Config.Vehicles.Van.health
+            local maxHealth = Config.Formation.Van.health
             
             local percent = (health / maxHealth) * 100
 

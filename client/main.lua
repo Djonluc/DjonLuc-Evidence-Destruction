@@ -24,70 +24,97 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
     ConvoyState = data.state -- Ensure state is synced
     
     local van = NetworkGetEntityFromNetworkId(data.vanNetId)
-    if not DoesEntityExist(van) then return end
+    local leader = NetworkGetEntityFromNetworkId(data.leaderNetId)
+    if not DoesEntityExist(van) or not DoesEntityExist(leader) then return end
 
-    local driver = GetPedInVehicleSeat(van, -1)
-    if not driver or not DoesEntityExist(driver) then return end
+    local leaderDriver = GetPedInVehicleSeat(leader, -1)
+    if not leaderDriver or not DoesEntityExist(leaderDriver) then return end
 
-    -- Apply Mission & Visual Attributes (Delegated from Server)
-    SetEntityAsMissionEntity(van, true, true)
-    SetVehicleEngineOn(van, true, true)
-    SetVehicleTyresCanBurst(van, false)
-    
-    -- Sync Networking Flags
-    local netId = data.vanNetId
-    SetNetworkIdExistsOnAllMachines(netId, true)
-    SetNetworkIdCanMigrate(netId, false)
-    
-    if Config.Vehicles.Van.health then
-        SetEntityMaxHealth(van, Config.Vehicles.Van.health)
-        SetEntityHealth(van, Config.Vehicles.Van.health)
-    end
-
-    SetEntityAsMissionEntity(driver, true, true)
-    SetPedArmour(driver, Config.Peds.Driver.armor or 100)
-
-    local style = 786603
-    local speed = data.speed
+    -- Elite Drive Style & Parameters
+    local style = data.style or 786603
+    local speed = data.speed or 30.0
+    local escortSpeed = speed + 5.0
 
     if data.state == "ALERT" then
-        style = 1074528293
-        speed = speed + 10.0
+        speed = speed + 5.0
     elseif data.state == "DEFENSIVE" then
+        speed = speed * 0.5 
         style = 1074528293
-        speed = speed + 20.0
     end
 
-    -- Van Driver Task
-    TaskVehicleDriveToCoordLongrange(driver, van, data.dest.x, data.dest.y, data.dest.z, speed, style, 10.0)
+    -- 1. Leader Logic
+    SetVehicleSiren(leader, true)
+    local maxSpeedMS = speed / 2.237
+    SetVehicleMaxSpeed(leader, maxSpeedMS)
+    
+    if data.state == "DEFENSIVE" then
+        TaskVehicleTempAction(leaderDriver, leader, 6, 10000) -- Stop!
+    else
+        TaskVehicleDriveToCoordLongrange(leaderDriver, leader, data.dest.x, data.dest.y, data.dest.z, speed, style, 10.0)
+    end
 
-    -- Escort Tasks
-    for _, escortNetId in ipairs(data.escortNetIds) do
-        local escort = NetworkGetEntityFromNetworkId(escortNetId)
-        if DoesEntityExist(escort) then
-            local escortDriver = GetPedInVehicleSeat(escort, -1)
-            if escortDriver and DoesEntityExist(escortDriver) then
-                -- Apply Mission & Visual Attributes
-                SetEntityAsMissionEntity(escort, true, true)
-                SetVehicleEngineOn(escort, true, true)
-                SetEntityAsMissionEntity(escortDriver, true, true)
-                
-                SetNetworkIdExistsOnAllMachines(escortNetId, true)
-                SetNetworkIdCanMigrate(escortNetId, false)
-                
-                TaskVehicleEscort(escortDriver, escort, van, -1, speed + 5.0, style, 5.0, 0, 5.0)
+    -- 2. Van Logic
+    if van ~= leader then
+        local vanDriver = GetPedInVehicleSeat(van, -1)
+        if vanDriver and DoesEntityExist(vanDriver) then
+            SetVehicleSiren(van, true)
+            SetVehicleMaxSpeed(van, maxSpeedMS)
+            if data.state == "DEFENSIVE" then
+                TaskVehicleTempAction(vanDriver, van, 6, 10000)
+            else
+                TaskVehicleEscort(vanDriver, van, leader, -1, speed, style, 8.0, 10, 5.0)
             end
         end
     end
+
+    -- 3. Escorts Logic
+    for _, escortNetId in ipairs(data.escortNetIds) do
+        local escort = NetworkGetEntityFromNetworkId(escortNetId)
+        if DoesEntityExist(escort) and escort ~= leader and escort ~= van then
+            local escortDriver = GetPedInVehicleSeat(escort, -1)
+            if escortDriver and DoesEntityExist(escortDriver) then
+                SetEntityAsMissionEntity(escort, true, true)
+                SetVehicleSiren(escort, true)
+                SetVehicleMaxSpeed(escort, maxSpeedMS)
+                
+                local escortMode = (GetVehicleClass(escort) == 8) and 12 or -1
+                local escortDist = (GetVehicleClass(escort) == 8) and 4.0 or 7.0
+
+                if data.state == "DEFENSIVE" then
+                    TaskVehicleTempAction(escortDriver, escort, 6, 10000)
+                else
+                    TaskVehicleEscort(escortDriver, escort, leader, escortMode, speed, style, escortDist, 10, 4.0)
+                end
+            end
+        end
+    end
+
+    -- 4. Speed Lock Thread
+    CreateThread(function()
+        while ConvoyActive and ConvoyState ~= "DEFENSIVE" do
+            local leaderSpeed = GetEntitySpeed(leader)
+            if leaderSpeed > 0.1 then
+                for _, escortId in ipairs(data.escortNetIds) do
+                    local v = NetworkGetEntityFromNetworkId(escortId)
+                    if DoesEntityExist(v) and v ~= leader then
+                        if GetEntitySpeed(v) > leaderSpeed + 1.2 then
+                            SetVehicleForwardSpeed(v, leaderSpeed)
+                        end
+                    end
+                end
+            end
+            Wait(200)
+        end
+    end)
     
-    print("^2[CONVOY]^7 Synchronized AI tasks on client (State: " .. data.state .. ")")
+    print("^2[CONVOY]^7 Synchronized Elite AI tasks (State: " .. data.state .. ")")
 end)
 
 -- Interaction / Looting Logic
 RegisterNetEvent("djonluc:client:vanDestroyed", function()
     if Config.Event.UseTarget then
         -- Logic to add target to van
-        local vanHash = joaat(Config.Vehicles.Van.model)
+        local vanHash = joaat(Config.Formation.Van.model)
         local vehicles = GetGamePool("CVehicle")
         
         for _, veh in ipairs(vehicles) do

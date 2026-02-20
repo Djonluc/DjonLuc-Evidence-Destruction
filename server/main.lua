@@ -47,16 +47,25 @@ function SyncConvoyTasks()
     
     local vanNetId = NetworkGetNetworkIdFromEntity(Convoy.van)
     local escortNetIds = {}
+    local leaderNetId = vanNetId -- Default to van
+    
+    -- If we have escorts, the first one (Bikes or Patrol) should lead the physical movement
+    if #Convoy.escorts > 0 then
+        leaderNetId = NetworkGetNetworkIdFromEntity(Convoy.escorts[1])
+    end
+
     for _, escort in ipairs(Convoy.escorts) do
         table.insert(escortNetIds, NetworkGetNetworkIdFromEntity(escort))
     end
 
     TriggerClientEvent("djonluc:client:syncConvoyTasks", -1, {
         vanNetId = vanNetId,
+        leaderNetId = leaderNetId,
         escortNetIds = escortNetIds,
         state = Convoy.state,
         dest = Config.Route.Destination,
-        speed = Config.Route.DriveSpeed or 20.0
+        speed = Config.Route.DriveSpeed or 20.0,
+        style = Config.Route.DrivingStyle or 786603
     })
     
     DebugLog("INFO", "Syncing convoy tasks to clients (State: " .. Convoy.state .. ")")
@@ -77,7 +86,7 @@ CreateThread(function()
         if Convoy.active and Convoy.van then
             if DoesEntityExist(Convoy.van) then
                 local health = GetEntityHealth(Convoy.van)
-                local maxHealth = Config.Vehicles.Van.health
+                local maxHealth = Config.Formation.Van.health
                 Convoy.health = health
 
                 -- State Machine logic
@@ -185,11 +194,17 @@ RegisterCommand("convoystart", function(source)
         if SpawnFullConvoy() then
             Convoy.active = true
             Convoy.startedAt = os.time()
-            Convoy.health = Config.Vehicles.Van.health
+            Convoy.health = Config.Formation.Van.health
             Convoy.destroyed = false
             Convoy.underAttack = false
             
-            Wait(500) -- Small delay for net-sync
+            Wait(100) -- Small delay for net-sync
+            
+            -- Wait for formation to settle
+            local delay = (Config.Event.StartDelay or 3) * 1000
+            DebugLog("INFO", "Waiting " .. (delay/1000) .. "s for formation to settle...")
+            Wait(delay)
+
             StartConvoyMovement()
             
             TriggerClientEvent("djonluc:client:startBlips", -1, NetworkGetNetworkIdFromEntity(Convoy.van))
@@ -265,7 +280,7 @@ RegisterCommand("convoyspawnhere", function(source)
         sx, sy, sz, sw = Config.Route.Start.x, Config.Route.Start.y, Config.Route.Start.z, Config.Route.Start.w
     end
 
-    local vehicle = SpawnConfiguredVehicle(Config.Vehicles.Van, vector4(sx, sy, sz, sw))
+    local vehicle = SpawnConfiguredVehicle(Config.Formation.Van, vector4(sx, sy, sz, sw))
     if vehicle then
         SpawnPedInVehicle(vehicle, Config.Peds.Driver, -1)
         DebugLog("OK", "Successfully spawned test vehicle near player.")
