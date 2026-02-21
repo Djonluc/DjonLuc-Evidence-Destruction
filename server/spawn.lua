@@ -27,38 +27,23 @@ end
 
 function SpawnPedInVehicle(vehicle, pedData, seat)
     local hash = joaat(pedData.model)
+
     local coords = GetEntityCoords(vehicle)
-    
     local ped = CreatePed(28, hash, coords.x, coords.y, coords.z, 0.0, true, true)
 
-    local timeout = 0
-    while not DoesEntityExist(ped) and timeout < 100 do
-        Wait(10)
-        timeout = timeout + 1
-    end
-
-    if not ped or ped == 0 or not DoesEntityExist(ped) then
-        print("^1[CONVOY ERROR]^7 Failed to spawn ped:", pedData.model)
+    if not DoesEntityExist(ped) then
+        print("^1[CONVOY ERROR]^7 Ped failed to spawn:", pedData.model)
         return nil
     end
 
-    if vehicle and seat then
-        SetPedIntoVehicle(ped, vehicle, seat)
-    end
+    SetPedIntoVehicle(ped, vehicle, seat or -1)
 
-    local pedNetId = 0
-    local timeout = 0
-    while pedNetId == 0 and timeout < 100 do
-        pedNetId = NetworkGetNetworkIdFromEntity(ped)
-        if pedNetId == 0 then Wait(10) end
-        timeout = timeout + 1
-    end
+    -- Server Authoritative Basics
+    GiveWeaponToPed(ped, joaat(pedData.weapon), 500, false, true)
+    SetPedDropsWeaponsWhenDead(ped, false)
+    SetEntityAsMissionEntity(ped, true, true)
 
-    if pedNetId == 0 then
-        print("^1[CONVOY ERROR]^7 Failed to get netId for ped:", pedData.model)
-        return nil
-    end
-
+    local pedNetId = NetworkGetNetworkIdFromEntity(ped)
     local vehNetId = NetworkGetNetworkIdFromEntity(vehicle)
     
     TriggerClientEvent("djonluc:client:setGuardGroup", -1, pedNetId, vehNetId, seat or -1, pedData.accuracy, pedData.armor, pedData.weapon)

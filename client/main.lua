@@ -90,7 +90,7 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
             data.dest.x,
             data.dest.y,
             data.dest.z,
-            speed,
+            data.speed or 35.0,
             1074528293,
             5.0
         )
@@ -98,26 +98,6 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
         SetDriverAbility(leaderDriver, 1.0)
         SetDriverAggressiveness(leaderDriver, 1.0)
         SetPedKeepTask(leaderDriver, true)
-
-        -- Fix 2: Speed Governor Thread
-        CreateThread(function()
-            while ConvoyActive do
-                Wait(500)
-
-                if NetworkDoesEntityExistWithNetworkId(data.vanNetId) then
-                    local vanEntity = NetworkGetEntityFromNetworkId(data.vanNetId)
-
-                    if DoesEntityExist(vanEntity) then
-                        local maxSpeed = (data.speed or 35.0) / 2.237 -- mph to m/s
-
-                        if GetEntitySpeed(vanEntity) > maxSpeed then
-                            SetVehicleForwardSpeed(vanEntity, maxSpeed)
-                        end
-                    end
-                end
-            end
-        end)
-
         SetVehicleSiren(leader, true)
 
         -- Everyone else escorts leader
@@ -137,9 +117,9 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
                             escort,
                             leader,
                             1,
-                            speed - 2.0,
+                            (data.speed or 35.0) - 2.0,
                             1074528293,
-                            10.0,
+                            12.0,
                             20,
                             40.0
                         )
