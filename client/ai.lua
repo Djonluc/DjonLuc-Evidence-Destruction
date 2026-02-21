@@ -2,13 +2,12 @@
 print("^2[CONVOY] client/ai.lua loaded successfully.^7")
 ConvoyGroupHash = nil
 local HostilePlayers = {}
--- ConvoyState is global from main.lua
 
 CreateThread(function()
     AddRelationshipGroup("CONVOY_GUARDS")
     ConvoyGroupHash = GetHashKey("CONVOY_GUARDS")
 
-    -- Neutral to everyone by default
+    -- Default neutral
     SetRelationshipBetweenGroups(0, ConvoyGroupHash, joaat("PLAYER"))
     SetRelationshipBetweenGroups(0, joaat("PLAYER"), ConvoyGroupHash)
 
@@ -19,7 +18,6 @@ end)
 RegisterNetEvent("djonluc:client:updateHostiles", function(data)
     HostilePlayers = data
 
-    -- Make convoy hostile to those players
     for id, _ in pairs(HostilePlayers) do
         local player = GetPlayerFromServerId(id)
         if player then
@@ -29,6 +27,11 @@ RegisterNetEvent("djonluc:client:updateHostiles", function(data)
                     5,
                     ConvoyGroupHash,
                     GetPedRelationshipGroupHash(ped)
+                )
+                SetRelationshipBetweenGroups(
+                    5,
+                    GetPedRelationshipGroupHash(ped),
+                    ConvoyGroupHash
                 )
             end
         end
@@ -73,7 +76,6 @@ RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, se
             SetPedCombatRange(ped, Config.AI.CombatRange or 2)
             SetPedAsCop(ped, true)
             SetEntityAsMissionEntity(ped, true, true)
-            SetEntityPersistence(ped, true)
             SetPedCanBeTargetted(ped, true) -- Correct native for targeting
             
             SetNetworkIdExistsOnAllMachines(pedNetId, true)

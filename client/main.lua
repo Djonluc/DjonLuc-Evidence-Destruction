@@ -83,7 +83,7 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
         local style = data.style or 786603
         local speed = data.speed or 35.0
 
-        -- Leader drives to destination
+        -- Leader (Riot Van)
         TaskVehicleDriveToCoordLongrange(
             leaderDriver,
             leader,
@@ -91,12 +91,12 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
             data.dest.y,
             data.dest.z,
             speed,
-            1074528293, -- Force aggressive style
-            5.0         -- Lower stopping distance
+            1074528293,
+            5.0
         )
 
-        SetDriverAggressiveness(leaderDriver, 1.0)
         SetDriverAbility(leaderDriver, 1.0)
+        SetDriverAggressiveness(leaderDriver, 1.0)
         SetPedKeepTask(leaderDriver, true)
 
         -- Fix 2: Speed Governor Thread
@@ -138,14 +138,14 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
                             leader,
                             1,
                             speed - 2.0,
-                            1074528293, -- same aggressive style
-                            8.0,
+                            1074528293,
+                            10.0,
                             20,
                             40.0
                         )
 
-                        SetDriverAggressiveness(escortDriver, 1.0)
                         SetDriverAbility(escortDriver, 1.0)
+                        SetDriverAggressiveness(escortDriver, 1.0)
                         SetPedKeepTask(escortDriver, true)
                     end
                 end
