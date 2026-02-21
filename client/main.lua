@@ -91,9 +91,13 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
             data.dest.y,
             data.dest.z,
             speed,
-            style,
-            20.0
+            1074528293, -- Force aggressive style
+            5.0         -- Lower stopping distance
         )
+
+        SetDriverAggressiveness(leaderDriver, 1.0)
+        SetDriverAbility(leaderDriver, 1.0)
+        SetPedKeepTask(leaderDriver, true)
 
         -- Fix 2: Speed Governor Thread
         CreateThread(function()
@@ -132,13 +136,17 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
                             escortDriver,
                             escort,
                             leader,
-                            1,              -- formation mode (stay behind, not side)
-                            speed - 3.0,    -- slightly slower than van
-                            786603,         -- safer driving style for escorts
-                            10.0,           -- spacing
+                            1,
+                            speed - 2.0,
+                            1074528293, -- same aggressive style
+                            8.0,
                             20,
-                            35.0
+                            40.0
                         )
+
+                        SetDriverAggressiveness(escortDriver, 1.0)
+                        SetDriverAbility(escortDriver, 1.0)
+                        SetPedKeepTask(escortDriver, true)
                     end
                 end
             end

@@ -8,13 +8,31 @@ CreateThread(function()
     AddRelationshipGroup("CONVOY_GUARDS")
     ConvoyGroupHash = GetHashKey("CONVOY_GUARDS")
 
-    -- Passive/Friendly to everyone by default
+    -- Neutral to everyone by default
     SetRelationshipBetweenGroups(0, ConvoyGroupHash, joaat("PLAYER"))
-    SetRelationshipBetweenGroups(0, ConvoyGroupHash, ConvoyGroupHash)
+    SetRelationshipBetweenGroups(0, joaat("PLAYER"), ConvoyGroupHash)
+
+    -- Friendly to themselves
+    SetRelationshipBetweenGroups(1, ConvoyGroupHash, ConvoyGroupHash)
 end)
 
 RegisterNetEvent("djonluc:client:updateHostiles", function(data)
     HostilePlayers = data
+
+    -- Make convoy hostile to those players
+    for id, _ in pairs(HostilePlayers) do
+        local player = GetPlayerFromServerId(id)
+        if player then
+            local ped = GetPlayerPed(player)
+            if DoesEntityExist(ped) then
+                SetRelationshipBetweenGroups(
+                    5,
+                    ConvoyGroupHash,
+                    GetPedRelationshipGroupHash(ped)
+                )
+            end
+        end
+    end
 end)
 
 -- State is synced globally in main.lua handler
@@ -161,98 +179,7 @@ CreateThread(function()
     end
 end)
 
-
--- Helper: Count hostiles nearby
-local function CountHostilesNearby(coords, radius)
-    local count = 0
-    for id, _ in pairs(HostilePlayers) do
-        local player = GetPlayerFromServerId(id)
-        if player then
-            local ped = GetPlayerPed(player)
-            if #(GetEntityCoords(ped) - coords) < radius then
-                count = count + 1
-            end
-        end
-    end
-    return count
-end
-
--- Reactive Combat Targeting + Escalation
-CreateThread(function()
-    while true do
-        Wait(1000)
-        if not ConvoyActive then goto skip_combat end
-
-        local escalationTriggered = (ConvoyState == "DEFENSIVE")
-
-        for _, guard in ipairs(GetGamePool("CPed")) do
-            if GetPedRelationshipGroupHash(guard) == ConvoyGroupHash then
-                local guardCoords = GetEntityCoords(guard)
-                
-                -- Draw weapon if in ALERT or higher
-                if (ConvoyState == "ALERT" or ConvoyState == "DEFENSIVE") then
-                    if not IsPedArmed(guard, 7) then
-                        local weapon = GetSelectedPedWeapon(guard)
-                        if weapon ~= joaat("WEAPON_UNARMED") then
-                            SetCurrentPedWeapon(guard, weapon, true)
-                        end
-                    end
-                else
-                    if IsPedArmed(guard, 7) then
-                        SetCurrentPedWeapon(guard, joaat("WEAPON_UNARMED"), true)
-                        if not IsPedInAnyVehicle(guard, false) then
-                            ClearPedTasks(guard)
-                        end
-                    end
-                end
-
-                -- Precision Targeting: ONLY target hostiles
-                local hasTarget = false
-                if ConvoyState ~= "CALM" then
-                    for _, player in ipairs(GetActivePlayers()) do
-                        local serverId = GetPlayerServerId(player)
-                        if HostilePlayers[serverId] then
-                            local targetPed = GetPlayerPed(player)
-                            local dist = #(guardCoords - GetEntityCoords(targetPed))
-                            
-                            if dist < 120.0 then
-                                hasTarget = true
-                                if IsPedInAnyVehicle(guard, false) then
-                                    local vehicle = GetVehiclePedIsIn(guard, false)
-                                    -- DO NOT let drivers exit
-                                    if GetPedInVehicleSeat(vehicle, -1) ~= guard then
-                                        if Config.AI.ExitOnAttack then
-                                            local shouldStop = math.random(1, 100) <= 40 -- 40% of guards stop
-                                            if shouldStop then
-                                                if escalationTriggered or dist < 60.0 then
-                                                    TaskLeaveVehicle(guard, vehicle, 256)
-                                                end
-                                            end
-                                        end
-                                    end
-                                else
-                                    if not IsPedGettingIntoAVehicle(guard) then
-                                        TaskCombatPed(guard, targetPed, 0, 16)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-                if not hasTarget and not IsPedInAnyVehicle(guard, false) and ConvoyState == "CALM" then
-                    ClearPedTasks(guard)
-                end
-            end
-        end
-
-        ::skip_combat::
-    end
-end)
-
-
-
--- Remove legacy relationship group force logic (It competes with the reactive system)
+-- Reactive AI Logic (Using native relationship hostility now)
 
 -- BIKE REMOUNT SYSTEM (Robust Version)
 CreateThread(function()
