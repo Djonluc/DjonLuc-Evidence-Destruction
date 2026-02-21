@@ -231,7 +231,9 @@ CreateThread(function()
                                         end
                                     end
                                 else
-                                    TaskCombatPed(guard, targetPed, 0, 16)
+                                    if not IsPedGettingIntoAVehicle(guard) then
+                                        TaskCombatPed(guard, targetPed, 0, 16)
+                                    end
                                 end
                             end
                         end
@@ -252,33 +254,44 @@ end)
 
 -- Remove legacy relationship group force logic (It competes with the reactive system)
 
--- BIKE RECOVERY SYSTEM
+-- BIKE REMOUNT SYSTEM (Robust Version)
 CreateThread(function()
     while true do
-        Wait(2000)
+        Wait(1500)
 
         if not ConvoyActive then goto skip end
 
         for _, ped in ipairs(GetGamePool("CPed")) do
             if GetPedRelationshipGroupHash(ped) == ConvoyGroupHash then
-                if not IsPedInAnyVehicle(ped, false) then
-                    -- Find closest convoy bike
-                    local closestVeh = nil
-                    local closestDist = 999.0
+
+                -- Only care about bike riders
+                if not IsPedInAnyVehicle(ped, false) and not IsPedRagdoll(ped) and not IsPedDeadOrDying(ped) then
+
                     local pedCoords = GetEntityCoords(ped)
+                    local closestBike = nil
+                    local closestDist = 999.0
 
                     for _, veh in ipairs(GetGamePool("CVehicle")) do
                         if GetVehicleClass(veh) == 8 then -- Bikes only
-                            local dist = #(pedCoords - GetEntityCoords(veh))
-                            if dist < closestDist then
-                                closestDist = dist
-                                closestVeh = veh
+                            local driver = GetPedInVehicleSeat(veh, -1)
+
+                            -- Ensure bike belongs to convoy (driver is convoy guard or empty)
+                            if not driver or GetPedRelationshipGroupHash(driver) == ConvoyGroupHash then
+                                local dist = #(pedCoords - GetEntityCoords(veh))
+                                if dist < closestDist then
+                                    closestDist = dist
+                                    closestBike = veh
+                                end
                             end
                         end
                     end
 
-                    if closestVeh and closestDist < 15.0 then
-                        TaskEnterVehicle(ped, closestVeh, 5000, -1, 2.0, 1, 0)
+                    if closestBike and closestDist < 20.0 then
+                        -- Clear combat temporarily so GTA allows entering
+                        ClearPedTasks(ped)
+
+                        -- Force them to enter driver seat
+                        TaskEnterVehicle(ped, closestBike, 8000, -1, 2.0, 1, 0)
                     end
                 end
             end
