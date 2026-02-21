@@ -61,17 +61,18 @@ function SyncConvoyTasks()
         table.insert(escortNetIds, vanNetId)
     end
 
-    TriggerClientEvent("djonluc:client:syncConvoyTasks", -1, {
+    -- CRITICAL: Only the controller (starter) handles AI tasks to prevent desync
+    TriggerClientEvent("djonluc:client:syncConvoyTasks", Convoy.controller, {
         vanNetId = vanNetId,
         leaderNetId = leaderNetId,
         escortNetIds = escortNetIds,
         state = Convoy.state,
         dest = Config.Route.Destination,
         speed = Config.Route.DriveSpeed or 20.0,
-        style = Config.Route.DrivingStyle or 786603
+        style = Config.Route.DrivingStyle or 1074528293
     })
     
-    DebugLog("INFO", "Syncing convoy tasks to clients (State: " .. Convoy.state .. ")")
+    DebugLog("INFO", "Syncing convoy tasks to CONTROLLER: " .. Convoy.controller .. " (State: " .. Convoy.state .. ")")
 end
 
 -- Movement Logic
@@ -265,11 +266,7 @@ function SpawnBackupUnits()
         0.0
     )
 
-    local backupVeh = SpawnConfiguredVehicle({
-        model = "fbi2",
-        seats = 4,
-        locked = false
-    }, backupPos)
+    local backupVeh = SafeSpawnVehicle("fbi2", backupPos)
 
     if backupVeh then
         table.insert(Convoy.escorts, backupVeh)
@@ -343,7 +340,7 @@ RegisterCommand("convoyspawnhere", function(source)
         sx, sy, sz, sw = Config.Route.Start.x, Config.Route.Start.y, Config.Route.Start.z, Config.Route.Start.w
     end
 
-    local vehicle = SpawnConfiguredVehicle(Config.Formation.Van, vector4(sx, sy, sz, sw))
+    local vehicle = SafeSpawnVehicle(Config.Formation.Van.model, vector4(sx, sy, sz, sw))
     if vehicle then
         SpawnPedInVehicle(vehicle, Config.Peds.Driver, -1)
         DebugLog("OK", "Successfully spawned test vehicle near player.")
@@ -422,7 +419,7 @@ RegisterNetEvent("djonluc:server:loot", function()
 
     for _, loot in pairs(Config.Loot) do
         local amount = math.random(loot.min, loot.max)
-        Inventory.AddItem(src, loot.item, amount)
+        Framework.AddItem(src, loot.item, amount)
     end
     
     Framework.Notify(src, "Loot secured!", "success")

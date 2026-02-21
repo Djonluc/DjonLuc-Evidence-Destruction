@@ -1,178 +1,226 @@
 -- client/ai.lua
-print("^2[CONVOY] client/ai.lua loaded successfully.^7")
 
-ConvoyGroupHash = nil
+ConvoyActive = false
+ConvoyActiveNetId = nil
+local ConvoyGroupHash = joaat("DJONLUC_CONVOY_GUARD")
+local LawGroupHash = joaat("LawEnforcement")
+local LocalLawPlayers = {}
 
--- 1️⃣ RELATIONSHIP SETUP
+-- SHARED COMBAT STATE
+local GlobalConvoyInCombat = false
+local LastCombatTime = 0
+
+-- Initialize Relationship Groups
 CreateThread(function()
-    AddRelationshipGroup("CONVOY_GUARDS")
-    ConvoyGroupHash = GetHashKey("CONVOY_GUARDS")
-
-    -- Start neutral to players
-    SetRelationshipBetweenGroups(0, ConvoyGroupHash, joaat("PLAYER"))
-    SetRelationshipBetweenGroups(0, joaat("PLAYER"), ConvoyGroupHash)
+    AddRelationshipGroup("DJONLUC_CONVOY_GUARD")
+    ConvoyGroupHash = joaat("DJONLUC_CONVOY_GUARD")
     
-    -- Friendly to self
-    SetRelationshipBetweenGroups(1, ConvoyGroupHash, ConvoyGroupHash)
+    -- Professional hostility: Convoy hates everyone EXCEPT law enforcement
+    SetRelationshipBetweenGroups(5, ConvoyGroupHash, joaat("PLAYER"))
+    SetRelationshipBetweenGroups(0, ConvoyGroupHash, joaat("LawEnforcement"))
+    SetRelationshipBetweenGroups(0, joaat("LawEnforcement"), ConvoyGroupHash)
 end)
 
--- 2️⃣ TACTICAL INITIALIZATION HANDLER (Restoring attributes removed from server)
+RegisterNetEvent("djonluc:client:updateLawPlayers", function(lawList)
+    LocalLawPlayers = lawList or {}
+end)
+
+-- 1️⃣ TACTICAL INITIALIZATION (Elite Attributes)
 RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, seat, accuracy, armor, weapon)
+    -- CLIENT-SIDE HARDENING: Wait for entities to register on client
+    local ped = 0
+    local vehicle = 0
     local timeout = 0
-    while not NetworkDoesEntityExistWithNetworkId(pedNetId) and timeout < 100 do
-        Wait(10)
+    
+    while (ped == 0 or vehicle == 0) and timeout < 40 do
+        if ped == 0 and NetworkDoesEntityExistWithNetworkId(pedNetId) then
+            ped = NetworkGetEntityFromNetworkId(pedNetId)
+        end
+        if vehicle == 0 and NetworkDoesEntityExistWithNetworkId(vehNetId) then
+            vehicle = NetworkGetEntityFromNetworkId(vehNetId)
+        end
+        
+        if ped ~= 0 and vehicle ~= 0 then break end
+        
+        Wait(50)
         timeout = timeout + 1
     end
+    
+    if ped ~= 0 and DoesEntityExist(ped) then
+        ConvoyActive = true
+        ConvoyActiveNetId = vehNetId
 
-    if NetworkDoesEntityExistWithNetworkId(pedNetId) then
-        local ped = NetworkGetEntityFromNetworkId(pedNetId)
-        if DoesEntityExist(ped) then
-            SetPedRelationshipGroupHash(ped, ConvoyGroupHash)
-            SetEntityAsMissionEntity(ped, true, true)
-            NetworkRequestControlOfEntity(ped)
-
-            -- Restoration of tactical attributes (Moved to client for stability)
-            SetPedAccuracy(ped, accuracy or 90)
-            if armor then SetPedArmour(ped, armor) end
-            if weapon then 
-                SetCurrentPedWeapon(ped, joaat(weapon), true)
-            end
-
-            SetPedAsCop(ped, true)
-            SetPedFleeAttributes(ped, 0, false)
-            SetBlockingOfNonTemporaryEvents(ped, true)
-
-            -- Global Combat attributes
-            SetPedCombatAttributes(ped, 0, true)  -- Can use cover
-            SetPedCombatAttributes(ped, 2, true)  -- Can do drive-bys
-            SetPedCombatAttributes(ped, 4, true)  -- Can shoot from vehicle
-            SetPedCombatAttributes(ped, 5, true)  -- Fight armed when unarmed
-            SetPedCombatAttributes(ped, 17, true) -- Never flee
-            SetPedCombatAttributes(ped, 46, true) -- Always fight
-            SetPedCombatAttributes(ped, 52, true) -- Force attack vehicle occupants
-            SetPedCombatAttributes(ped, 1, true)  -- BF_CanSwitchWeapon
-
-            SetPedCombatAbility(ped, 2)   -- Professional
-            SetPedCombatMovement(ped, 2)  -- Offensive
-            SetPedCombatRange(ped, 2)     -- Medium
-
-            SetPedConfigFlag(ped, 118, false) -- Disable Put Hands Up
+        -- REDUNDANT SEATING: Guarantee position on client
+        if vehicle ~= 0 and DoesEntityExist(vehicle) then
+            SetPedIntoVehicle(ped, vehicle, seat or -1)
         end
+        
+        -- Server -> Client Hand-off of Elite Attributes
+        SetPedRelationshipGroupHash(ped, ConvoyGroupHash)
+        SetPedAsCop(ped, true)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        SetPedFleeAttributes(ped, 0, false)
+        SetPedCombatAttributes(ped, 46, true) -- Always fight (Elite)
+        SetPedCombatAttributes(ped, 0, true)  -- Professional/Standard tactics
+        SetPedCombatAttributes(ped, 2, true)  -- Can use cover / Tactical Reload
+        SetPedCombatAttributes(ped, 5, true)  -- Defensive positioning
+        SetPedCombatAttributes(ped, 3, true)  -- Avoid fire (Prevents running into bullets)
+        
+        SetPedAccuracy(ped, accuracy or 90)
+        SetPedCombatAbility(ped, 2) -- Professional
+        SetEntityMaxHealth(ped, 200)
+        SetEntityHealth(ped, 200)
+        SetPedArmour(ped, armor or 100)
+
+        SetPedCombatRange(ped, 2) -- Medium-Long Range (Better engagement)
+        SetPedCombatMovement(ped, 2) -- Offensive/Tactical Flanking
+
+        -- Persistence
+        SetEntityAsMissionEntity(ped, true, true)
+        if vehicle and DoesEntityExist(vehicle) then
+            SetEntityAsMissionEntity(vehicle, true, true)
+        end
+        SetPedKeepTask(ped, true)
+        
+        -- Weapons
+        GiveWeaponToPed(ped, joaat(weapon), 500, false, true)
     end
 end)
 
--- 3️⃣ REACTIVE COMBAT THREAD (Deployment)
+-- 2️⃣ MILITARY-GRADE REACTIVE COMBAT THREAD (PRODUCTION ALIGNED)
 CreateThread(function()
     while true do
-        Wait(500)
+        Wait(300) -- Production frequency
 
-        if ConvoyActive then
-            for _, guard in ipairs(GetGamePool("CPed")) do
-                if GetPedRelationshipGroupHash(guard) == ConvoyGroupHash and not IsPedDeadOrDying(guard) then
-                    
-                    for _, player in ipairs(GetActivePlayers()) do
-                        local playerPed = GetPlayerPed(player)
-                        local serverId = GetPlayerServerId(player)
+        if not ConvoyActive then goto continue end
 
-                        -- Respond to shooting players (excluding friendly law-enforcement)
-                        if IsPedShooting(playerPed) and not LocalLawPlayers[serverId] then
-                            local dist = #(GetEntityCoords(guard) - GetEntityCoords(playerPed))
+        local convoyPeds = {}
+        local threatDetected = false
+        local nearestTarget = nil
 
-                            if dist < 80.0 then
-                                local veh = GetVehiclePedIsIn(guard, false)
+        -- A) SCAN FOR LOCAL THREATS
+        for _, guard in ipairs(GetGamePool("CPed")) do
+            if GetPedRelationshipGroupHash(guard) == ConvoyGroupHash and not IsPedDeadOrDying(guard) then
+                table.insert(convoyPeds, guard)
+                local guardCoords = GetEntityCoords(guard)
+                
+                for _, player in ipairs(GetActivePlayers()) do
+                    local playerPed = GetPlayerPed(player)
+                    local serverId = GetPlayerServerId(player)
 
-                                -- Bail out passengers only (Keep drivers focused on route)
-                                if veh ~= 0 and GetPedInVehicleSeat(veh, -1) ~= guard then
-                                    TaskLeaveVehicle(guard, veh, 256)
-                                    Wait(300)
-                                end
+                    if not LocalLawPlayers[serverId] then
+                        local dist = #(guardCoords - GetEntityCoords(playerPed))
 
-                                -- Lock on and fight
-                                TaskCombatPed(guard, playerPed, 0, 16)
-                                SetPedKeepTask(guard, true)
+                        if dist < 80.0 then
+                            if IsPedShooting(playerPed)
+                            or IsPlayerFreeAiming(player)
+                            or HasEntityBeenDamagedByEntity(guard, playerPed, true) then
+                                threatDetected = true
+                                nearestTarget = playerPed
+                                GlobalConvoyInCombat = true
+                                LastCombatTime = GetGameTimer()
                             end
                         end
                     end
                 end
             end
         end
+
+        -- B) SHARED RESPONSE: If one is in combat, everyone engages
+        if GlobalConvoyInCombat or threatDetected then
+            for _, guard in ipairs(convoyPeds) do
+                local veh = GetVehiclePedIsIn(guard, false)
+                
+                -- Everyone (including drivers) bail if engagement is sustained
+                if veh ~= 0 then
+                    TaskLeaveVehicle(guard, veh, 256)
+                    Wait(100)
+                end
+
+                if nearestTarget then
+                    TaskCombatPed(guard, nearestTarget, 0, 16)
+                    SetPedKeepTask(guard, true)
+                end
+            end
+        end
+
+        ::continue::
     end
 end)
 
--- 4️⃣ RECOVERY & RE-ENTRY LOGIC
+-- 3️⃣ RECOVERY, BIKE REMOUNT, AND ROUTE RESUMPTION
 CreateThread(function()
     while true do
-        Wait(5000)
+        Wait(3000)
 
-        if ConvoyActive then
-            local threat = false
+        if not ConvoyActive then goto continue_recovery end
 
-            -- Check if anyone is still shooting
+        -- A) NEUTRALIZATION CHECK: Has combat stopped for 10 seconds?
+        if GlobalConvoyInCombat and (GetGameTimer() - LastCombatTime > 10000) then
+            print("^2[CONVOY]^7 No active threats detected for 10s. Verifying neutralization...")
+            local stillThreat = false
+            
             for _, player in ipairs(GetActivePlayers()) do
-                if IsPedShooting(GetPlayerPed(player)) then
-                    threat = true
-                    break
-                end
-            end
-
-            -- If area is clear, return to vehicles
-            if not threat then
+                local playerPed = GetPlayerPed(player)
                 for _, guard in ipairs(GetGamePool("CPed")) do
                     if GetPedRelationshipGroupHash(guard) == ConvoyGroupHash and not IsPedDeadOrDying(guard) then
-                        if not IsPedInAnyVehicle(guard, false) and not IsPedRagdoll(guard) then
-                            local coords = GetEntityCoords(guard)
-                            local veh = GetClosestVehicle(coords.x, coords.y, coords.z, 25.0, 0, 70)
-
-                            if veh ~= 0 then
-                                TaskEnterVehicle(guard, veh, -1, -1, 2.0, 1, 0)
-                                SetPedKeepTask(guard, true)
+                        if #(GetEntityCoords(guard) - GetEntityCoords(playerPed)) < 100.0 then
+                            if IsPedShooting(playerPed) or IsPlayerFreeAiming(player) then
+                                stillThreat = true
+                                break
                             end
                         end
                     end
                 end
+                if stillThreat then break end
+            end
+
+            if not stillThreat then
+                print("^2[CONVOY]^7 Area secure. Triggering route resumption sequence.")
+                GlobalConvoyInCombat = false
+                TriggerEvent("djonluc:client:resumeRoute")
             end
         end
-    end
-end)
 
--- 5️⃣ BIKE REMOUNT SYSTEM (Standalone & Robust)
-CreateThread(function()
-    while true do
-        Wait(2000)
-
-        if ConvoyActive then
-            for _, ped in ipairs(GetGamePool("CPed")) do
-                if GetPedRelationshipGroupHash(ped) == ConvoyGroupHash then
-                    if not IsPedInAnyVehicle(ped, false) and not IsPedRagdoll(ped) and not IsPedDeadOrDying(ped) then
-                        local pedCoords = GetEntityCoords(ped)
-                        local closestBike = nil
-                        local closestDist = 999.0
-
-                        for _, veh in ipairs(GetGamePool("CVehicle")) do
-                            if GetVehicleClass(veh) == 8 then -- Bikes only
-                                local dist = #(pedCoords - GetEntityCoords(veh))
-                                if dist < closestDist and dist < 20.0 then
-                                    local driver = GetPedInVehicleSeat(veh, -1)
+        -- B) RECOVERY & REMOUNT
+        for _, guard in ipairs(GetGamePool("CPed")) do
+            if GetPedRelationshipGroupHash(guard) == ConvoyGroupHash and not IsPedDeadOrDying(guard) then
+                if not IsPedInAnyVehicle(guard, false) and not IsPedRagdoll(guard) and not GlobalConvoyInCombat then
+                    local pedCoords = GetEntityCoords(guard)
+                    
+                    local closestVeh = 0
+                    local minDist = 40.0
+                    
+                    for _, veh in ipairs(GetGamePool("CVehicle")) do
+                        local dist = #(pedCoords - GetEntityCoords(veh))
+                        if dist < minDist then
+                            if GetVehicleClass(veh) == 18 or GetVehicleClass(veh) == 8 or GetEntityModel(veh) == joaat("riot") then
+                                local driver = GetPedInVehicleSeat(veh, -1)
+                                if GetVehicleClass(veh) == 8 then
                                     if not driver or driver == 0 then
-                                        closestDist = dist
-                                        closestBike = veh
+                                        minDist = dist
+                                        closestVeh = veh
                                     end
+                                else
+                                    minDist = dist
+                                    closestVeh = veh
                                 end
                             end
                         end
+                    end
 
-                        if closestBike then
-                            ClearPedTasks(ped)
-                            TaskEnterVehicle(ped, closestBike, 8000, -1, 2.0, 1, 0)
-                        end
+                    if closestVeh ~= 0 then
+                        TaskEnterVehicle(guard, closestVeh, 15000, -1, 2.0, 1, 0)
                     end
                 end
             end
         end
+
+        ::continue_recovery::
     end
 end)
 
--- 6️⃣ PRE-STREAMING HANDLER (Ensures models are ready for server-side spawn)
+-- 4️⃣ PRE-STREAMING HANDLER
 RegisterNetEvent("djonluc:client:preloadFormation", function(models)
     print("^3[CONVOY]^7 Preloading models for spawn...")
     for _, model in ipairs(models) do
@@ -183,11 +231,6 @@ RegisterNetEvent("djonluc:client:preloadFormation", function(models)
             while not HasModelLoaded(hash) and timeout < 100 do
                 Wait(10)
                 timeout = timeout + 1
-            end
-            if HasModelLoaded(hash) then
-                print("^2[CONVOY]^7 Model pre-streamed: " .. model)
-            else
-                print("^1[CONVOY ERROR]^7 Model pre-streaming failed: " .. model)
             end
         end
     end

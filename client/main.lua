@@ -1,8 +1,7 @@
 -- client/main.lua
 print("^2[CONVOY] client/main.lua loaded successfully.^7")
 
-ConvoyActive = false
-ConvoyActiveNetId = nil
+local GlobalConvoyData = nil
 
 RegisterNetEvent("djonluc:client:startBlips", function(netId)
     ConvoyActive = true
@@ -12,6 +11,15 @@ end)
 RegisterNetEvent("djonluc:client:removeBlips", function()
     ConvoyActive = false
     ConvoyActiveNetId = nil
+    GlobalConvoyData = nil
+end)
+
+-- RESUME ROUTE HANDLER (PRODUCTION ALIGNMENT)
+RegisterNetEvent("djonluc:client:resumeRoute", function()
+    if GlobalConvoyData then
+        print("^2[CONVOY]^7 Threat neutralized. Resuming route tasking...")
+        TriggerEvent("djonluc:client:syncConvoyTasks", GlobalConvoyData)
+    end
 end)
 
 RegisterNetEvent("djonluc:client:stabilizeVehicle", function(netId)
@@ -20,12 +28,16 @@ RegisterNetEvent("djonluc:client:stabilizeVehicle", function(netId)
     if DoesEntityExist(veh) then
         FreezeEntityPosition(veh, true)
         SetVehicleOnGroundProperly(veh)
+        SetVehicleEngineOn(veh, true, true, false)
+        SetVehicleDoorsLocked(veh, 2)
+        SetNetworkIdCanMigrate(netId, false)
         Wait(200)
         FreezeEntityPosition(veh, false)
     end
 end)
 
 RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
+    GlobalConvoyData = data -- Cache for resumption
     CreateThread(function()
         local van = nil
         while not van do
@@ -54,7 +66,7 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
             data.dest.y,
             data.dest.z,
             data.speed,
-            1074528293,
+            1074528293, -- SWAT Driving Style (Elite Alignment)
             5.0
         )
         
@@ -71,21 +83,22 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
                 if DoesEntityExist(escortDriver) then
                     
                     TaskVehicleEscort(
-                        escortDriver,
-                        escort,
-                        leader,
-                        1,
-                        data.speed - 2.0,
-                        1074528293,
-                        12.0,
-                        20,
-                        40.0
-                    )
+                    escortDriver,
+                    escort,
+                    leader,
+                    -1, -- Proper follow mode for spacing
+                    data.speed - 5.0, -- Perfect lag for formation
+                    1074528293, -- SWAT Driving Style
+                    15.0, -- Precise production spacing
+                    30, -- Min distance for speed adjustment
+                    50.0 -- Max distance for tasking
+                )
                     
                     SetDriverAbility(escortDriver, 1.0)
                     SetDriverAggressiveness(escortDriver, 1.0)
                     SetPedKeepTask(escortDriver, true)
                     SetVehicleSiren(escort, true)
+                    SetVehicleHasMutedSirens(escort, false) -- Ensure they are audible
                 end
             end
         end

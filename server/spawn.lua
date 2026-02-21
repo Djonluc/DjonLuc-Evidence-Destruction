@@ -12,24 +12,20 @@ Convoy = {
     underAttack = false
 }
 
--- Comprehensive Diagnostic Spawn (Multi-Pass + Fallback)
+-- EXTREME SANITIZED SPAWN (Server-Side Only Natives)
 function SafeSpawnVehicle(modelNames, coords)
-    -- Normalize to table for fallback support
     local models = type(modelNames) == "table" and modelNames or {modelNames}
     local spawnedVeh = nil
 
     for _, model in ipairs(models) do
         local modelHash = joaat(model)
-        
-        -- Debugging hash
         print("^3[CONVOY DEBUG]^7 Attempting to spawn: " .. tostring(model) .. " | Hash: " .. tostring(modelHash))
 
-        -- Multi-pass retry loop
         for pass = 1, 3 do
-            -- Server-safe: true (isNetwork), false (isDynamic)
+            -- Server-safe: isNetwork=true, isDynamic=false
             local veh = CreateVehicle(modelHash, coords.x, coords.y, coords.z + 1.2, coords.w, true, false)
             
-            -- MUST wait a tick for server handle registration
+            -- Wait a tick for handle registration
             Wait(0)
 
             if veh and veh ~= 0 then
@@ -42,75 +38,105 @@ function SafeSpawnVehicle(modelNames, coords)
         end
 
         if spawnedVeh then break end
-        print("^1[CONVOY WARNING]^7 All passes failed for model: " .. tostring(model) .. ". Trying fallback if available...")
     end
 
-    if not spawnedVeh then
-        print("^1[CONVOY ERROR]^7 CRITICAL: All models and passes failed to spawn at " .. tostring(coords))
+    if not spawnedVeh or not DoesEntityExist(spawnedVeh) then
+        print("^1[CONVOY ERROR]^7 CRITICAL: All models and passes failed to spawn or entity was lost.")
         return nil
     end
 
-    SetEntityAsMissionEntity(spawnedVeh, true, true)
+    -- Robust NetID wait
+    local netId = 0
+    for i = 1, 10 do
+        netId = NetworkGetNetworkIdFromEntity(spawnedVeh)
+        if netId and netId ~= 0 then break end
+        Wait(50)
+    end
 
-    local netId = NetworkGetNetworkIdFromEntity(spawnedVeh)
+    if not netId or netId == 0 then
+        print("^1[CONVOY WARNING]^7 Failed to get netId for " .. tostring(spawnedVeh) .. " - Sync issues ممکن!")
+    end
+
+    -- Delegate stabilization to client (Engine, Doors, Migration, Mission Status)
     TriggerClientEvent("djonluc:client:stabilizeVehicle", -1, netId)
 
     return spawnedVeh
 end
 
 function SpawnPedInVehicle(vehicle, pedData, seat)
-    local modelHash = joaat(pedData.model)
-
-    -- Multi-pass ped spawn with server-side nuances
-    local ped = nil
-    for pass = 1, 3 do
-        ped = CreatePed(28, modelHash, 0.0, 0.0, 0.0, 0.0, true, false)
-        Wait(0)
-        if ped and ped ~= 0 then break end
-    end
-
-    if not ped or ped == 0 then
-        print("^1[CONVOY ERROR]^7 Failed to create ped: " .. tostring(pedData.model))
+    if not vehicle or not DoesEntityExist(vehicle) then
+        print("^1[CONVOY ERROR]^7 Cannot spawn ped: Vehicle is invalid.")
         return nil
     end
 
+    local modelHash = joaat(pedData.model)
+    local vCoords = GetEntityCoords(vehicle)
+
+    -- LOCALIZED CREATION: Spawn at vehicle pos to ensure handle validity
+    local ped = nil
+    for pass = 1, 3 do
+        -- Type 4: human/security (Universal)
+        ped = CreatePed(4, modelHash, vCoords.x, vCoords.y, vCoords.z, 0.0, true, false)
+        Wait(0)
+        
+        if ped and ped ~= 0 and DoesEntityExist(ped) then 
+            print("^2[CONVOY]^7 Ped spawned successfully: " .. tostring(pedData.model) .. " (Pass " .. pass .. ") | Handle: " .. tostring(ped))
+            break 
+        else
+            print("^3[CONVOY DEBUG]^7 Ped spawn pass " .. pass .. " failed for " .. tostring(pedData.model))
+        end
+    end
+
+    if not ped or ped == 0 or not DoesEntityExist(ped) then
+        print("^1[CONVOY ERROR]^7 Failed to create ped after all passes: " .. tostring(pedData.model))
+        return nil
+    end
+
+    -- STABILITY: Warp into seat
     SetPedIntoVehicle(ped, vehicle, seat or -1)
+    Wait(50) -- Wait for OneSync to sync seat occupancy
 
-    -- Server-Safe Persistence & Equipment
-    SetBlockingOfNonTemporaryEvents(ped, true)
-    GiveWeaponToPed(ped, joaat(pedData.weapon), 500, false, true)
-    SetEntityAsMissionEntity(ped, true, true)
+    -- Robust Ped NetID wait loop
+    local pedNetId = 0
+    for i = 1, 15 do
+        pedNetId = NetworkGetNetworkIdFromEntity(ped)
+        if pedNetId and pedNetId ~= 0 then break end
+        Wait(50)
+    end
 
-    local pedNetId = NetworkGetNetworkIdFromEntity(ped)
-    local vehNetId = NetworkGetNetworkIdFromEntity(vehicle)
+    -- Robust Vehicle NetID wait loop
+    local vehNetId = 0
+    for i = 1, 15 do
+        vehNetId = NetworkGetNetworkIdFromEntity(vehicle)
+        if vehNetId and vehNetId ~= 0 then break end
+        Wait(50)
+    end
+
+    if not pedNetId or pedNetId == 0 or not vehNetId or vehNetId == 0 then
+        print("^1[CONVOY WARNING]^7 Failed to sync NetIDs for ped/vehicle - Tactical setup may fail.")
+    end
     
-    -- Delegate tactical attributes to Client
+    -- ALL tactical setup (Weapons, Accuracy, Armour, BlockingEvents, Mission Status) done client-side
     TriggerClientEvent("djonluc:client:setGuardGroup", -1, pedNetId, vehNetId, seat or -1, pedData.accuracy, pedData.armor, pedData.weapon)
 
     return ped
 end
 
 function SpawnFullConvoy()
-    print("^3[CONVOY]^7 Starting full diagnostic convoy spawn sequence...")
+    print("^3[CONVOY]^7 Starting EXTREME ORDER spawn sequence (Vehicles -> Peds)...")
     local start = Config.Route.Start
     local formation = Config.Formation
 
-    -- 1️⃣ FRONT: ARMORED VAN (LEADER)
-    -- Primary: Riot, Fallbacks: Stockade, Police4 (Unmarked)
+    -- STAGE 1: Spawn all Vehicles
+    local vehicleTable = {}
+
+    -- 1) Lead Van
     local vanModels = { formation.Van.model, "stockade", "police4" }
     Convoy.van = SafeSpawnVehicle(vanModels, start)
-    
-    if not Convoy.van then
-        print("^1[CONVOY ERROR]^7 Convoy canceled: Could not spawn any viable lead vehicle.")
-        return false
-    end
+    if not Convoy.van then return false end
+    print("^2[CONVOY]^7 Van spawned.")
 
-    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Driver, -1))
-    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Guard, 0))
-
-    -- 2️⃣ ESCORTS
-    
-    -- Bikes (Behind Van)
+    -- 2) Escorts (Pure Vector Math Offsets)
     for i, bikeData in ipairs(formation.Bikes) do
         local side = (i == 1 and -2.2 or 2.2)
         local bikePos = vector4(
@@ -119,61 +145,87 @@ function SpawnFullConvoy()
             start.z,
             start.w
         )
-
-        local bike = SafeSpawnVehicle({bikeData.model, "policeb2", "faggio"}, bikePos)
+        local bike = SafeSpawnVehicle({bikeData.model, "policeb2"}, bikePos)
         if bike then
             table.insert(Convoy.escorts, bike)
-            table.insert(Convoy.guards, SpawnPedInVehicle(bike, Config.Peds.Driver, -1))
+            table.insert(vehicleTable, {veh = bike, type = "bike"})
         end
     end
 
-    -- Patrol (16m behind)
+    -- 3) Patrol (16m)
     local patrolPos = vector4(
         start.x + math.sin(math.rad(start.w)) * -16.0,
         start.y + math.cos(math.rad(start.w)) * -16.0,
         start.z,
         start.w
     )
-
-    local patrol = SafeSpawnVehicle({formation.Patrol.model, "police2", "police"}, patrolPos)
+    local patrol = SafeSpawnVehicle({formation.Patrol.model, "police2"}, patrolPos)
     if patrol then
         table.insert(Convoy.escorts, patrol)
-        table.insert(Convoy.guards, SpawnPedInVehicle(patrol, Config.Peds.Guard, 0))
-        table.insert(Convoy.guards, SpawnPedInVehicle(patrol, Config.Peds.Guard, 1))
+        table.insert(vehicleTable, {veh = patrol, type = "patrol"})
     end
 
-    -- SUV (24m behind)
+    -- 4) SUV (24m)
     local suvPos = vector4(
         start.x + math.sin(math.rad(start.w)) * -24.0,
         start.y + math.cos(math.rad(start.w)) * -24.0,
         start.z,
         start.w
     )
-
-    local suv = SafeSpawnVehicle({formation.SUV.model, "fbi2", "granger"}, suvPos)
+    local suv = SafeSpawnVehicle({formation.SUV.model, "fbi2"}, suvPos)
     if suv then
         table.insert(Convoy.escorts, suv)
-        for s = 0, (formation.SUV.seats or 4) - 2 do
-            table.insert(Convoy.guards, SpawnPedInVehicle(suv, Config.Peds.Guard, s))
-        end
+        table.insert(vehicleTable, {veh = suv, type = "suv"})
     end
 
-    -- Rear Escort (32m behind)
+    -- 5) Rear (32m)
     local rearPos = vector4(
         start.x + math.sin(math.rad(start.w)) * -32.0,
         start.y + math.cos(math.rad(start.w)) * -32.0,
         start.z,
         start.w
     )
-
-    local rear = SafeSpawnVehicle({formation.Rear.model, "fbi", "sheriff2"}, rearPos)
+    local rear = SafeSpawnVehicle({formation.Rear.model, "fbi"}, rearPos)
     if rear then
         table.insert(Convoy.escorts, rear)
-        for r = 0, (formation.Rear.seats or 4) - 2 do
-            table.insert(Convoy.guards, SpawnPedInVehicle(rear, Config.Peds.Guard, r))
+        table.insert(vehicleTable, {veh = rear, type = "rear"})
+    end
+
+    print("^3[CONVOY]^7 Vehicles spawned. Waiting for entity settlement...")
+    Wait(1000) -- Increased wait for network stability
+
+    -- STAGE 2: Spawn all Peds
+    print("^3[CONVOY]^7 Initializing Peds (Staggered Spawning)...")
+
+    -- Van Peds
+    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Driver, -1))
+    Wait(100)
+    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Guard, 0))
+    Wait(100)
+
+    -- Escort Peds
+    for _, data in ipairs(vehicleTable) do
+        if DoesEntityExist(data.veh) then
+            -- ALL VEHICLES GET A DRIVER
+            print("^3[CONVOY DEBUG]^7 Spawning driver for vehicle type: " .. tostring(data.type))
+            table.insert(Convoy.guards, SpawnPedInVehicle(data.veh, Config.Peds.Driver, -1))
+            Wait(100)
+
+            -- Add extra guards based on type
+            if data.type == "patrol" then
+                table.insert(Convoy.guards, SpawnPedInVehicle(data.veh, Config.Peds.Guard, 0))
+                Wait(100)
+            elseif data.type == "suv" or data.type == "rear" then
+                -- SUVs and Rear vehicles always get 3 extra guards (Seats 0, 1, 2)
+                print("^3[CONVOY DEBUG]^7 Spawning 3 guards for SUV/Rear vehicle.")
+                for s = 0, 2 do
+                    table.insert(Convoy.guards, SpawnPedInVehicle(data.veh, Config.Peds.Guard, s))
+                    Wait(100)
+                end
+            end
         end
     end
 
-    print("^2[CONVOY]^7 Full diagnostic convoy initialization complete.")
+    print("^2[CONVOY]^7 Full convoy order-spawn complete.")
     return true
 end

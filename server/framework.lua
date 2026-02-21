@@ -46,3 +46,5 @@ else
         TriggerClientEvent('djonluc:client:Notify', src, msg, type)
     end
 end
+
+Framework.GetJob = Framework.GetPlayerJob

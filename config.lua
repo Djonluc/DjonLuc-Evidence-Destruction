@@ -12,12 +12,9 @@ Config.Debug = {
 Config.Route = {
     Start = vector4(503.31, -1019.22, 28.06, 358.57), -- Where the Lead Bikes spawn (Front of convoy)
     Destination = vector4(-1693.0, 3007.2, 32.99, 7.62), -- The final goal for the secure van
-    DriveSpeed = 35.0, -- Default speed (MPH).
-    
-    -- Driving Style: 
-    -- 786603 (Default: Rushed, avoids traffic but stops at lights)
-    -- 1074528293 (Aggressive SWAT: IGNORES traffic, stops for nothing)
-    DrivingStyle = 786603 
+    DriveSpeed = 20.0,
+    DrivingStyle = 1074528293, -- SWAT mode: Ignores traffic, high aggression
+    RouteSelection = "fastest",
 }
 
 ---------------------------------------------------------------------
