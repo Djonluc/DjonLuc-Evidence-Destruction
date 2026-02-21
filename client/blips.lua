@@ -5,6 +5,8 @@ local eventBlip = nil
 RegisterNetEvent("djonluc:client:startBlips", function(netId)
     if eventBlip then RemoveBlip(eventBlip) end
 
+    if not netId or netId == 0 then return end
+    
     local vehicle = nil
     local timeout = 0
     while not vehicle and timeout < 100 do

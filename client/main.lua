@@ -19,95 +19,110 @@ RegisterNetEvent("djonluc:client:updateLawPlayers", function(data)
     LocalLawPlayers = data
 end)
 
+RegisterNetEvent("djonluc:client:stabilizeVehicle", function(netId)
+    if not NetworkDoesEntityExistWithNetworkId(netId) then return end
+    local vehicle = NetworkGetEntityFromNetworkId(netId)
+
+    if DoesEntityExist(vehicle) then
+        FreezeEntityPosition(vehicle, true)
+        SetEntityInvincible(vehicle, true)
+
+        SetVehicleOnGroundProperly(vehicle)
+
+        Wait(200)
+
+        FreezeEntityPosition(vehicle, false)
+        SetEntityInvincible(vehicle, false)
+    end
+end)
+
 RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
-    ConvoyActive = true
-    ConvoyState = data.state -- Ensure state is synced
-    
-    local van = NetworkGetEntityFromNetworkId(data.vanNetId)
-    local leader = NetworkGetEntityFromNetworkId(data.leaderNetId)
-    if not DoesEntityExist(van) or not DoesEntityExist(leader) then return end
-
-    local leaderDriver = GetPedInVehicleSeat(leader, -1)
-    if not leaderDriver or not DoesEntityExist(leaderDriver) then return end
-
-    -- Elite Drive Style & Parameters
-    local style = data.style or 786603
-    local speed = data.speed or 30.0
-    local escortSpeed = speed + 5.0
-
-    if data.state == "ALERT" then
-        speed = speed + 5.0
-    elseif data.state == "DEFENSIVE" then
-        speed = speed * 0.5 
-        style = 1074528293
-    end
-
-    -- 1. Leader Logic
-    SetVehicleSiren(leader, true)
-    local maxSpeedMS = speed / 2.237
-    SetVehicleMaxSpeed(leader, maxSpeedMS)
-    
-    if data.state == "DEFENSIVE" then
-        TaskVehicleTempAction(leaderDriver, leader, 6, 10000) -- Stop!
-    else
-        TaskVehicleDriveToCoordLongrange(leaderDriver, leader, data.dest.x, data.dest.y, data.dest.z, speed, style, 10.0)
-    end
-
-    -- 2. Van Logic
-    if van ~= leader then
-        local vanDriver = GetPedInVehicleSeat(van, -1)
-        if vanDriver and DoesEntityExist(vanDriver) then
-            SetVehicleSiren(van, true)
-            SetVehicleMaxSpeed(van, maxSpeedMS)
-            if data.state == "DEFENSIVE" then
-                TaskVehicleTempAction(vanDriver, van, 6, 10000)
-            else
-                TaskVehicleEscort(vanDriver, van, leader, -1, speed, style, 8.0, 10, 5.0)
-            end
-        end
-    end
-
-    -- 3. Escorts Logic
-    for _, escortNetId in ipairs(data.escortNetIds) do
-        local escort = NetworkGetEntityFromNetworkId(escortNetId)
-        if DoesEntityExist(escort) and escort ~= leader and escort ~= van then
-            local escortDriver = GetPedInVehicleSeat(escort, -1)
-            if escortDriver and DoesEntityExist(escortDriver) then
-                SetEntityAsMissionEntity(escort, true, true)
-                SetVehicleSiren(escort, true)
-                SetVehicleMaxSpeed(escort, maxSpeedMS)
-                
-                local escortMode = (GetVehicleClass(escort) == 8) and 12 or -1
-                local escortDist = (GetVehicleClass(escort) == 8) and 4.0 or 7.0
-
-                if data.state == "DEFENSIVE" then
-                    TaskVehicleTempAction(escortDriver, escort, 6, 10000)
-                else
-                    TaskVehicleEscort(escortDriver, escort, leader, escortMode, speed, style, escortDist, 10, 4.0)
+    CreateThread(function()
+        local van, leader, leaderDriver
+        local timeout = 0
+        
+        -- Wait for entities to arrive on client
+        while timeout < 100 do
+            if data.vanNetId ~= 0 and data.leaderNetId ~= 0 then
+                if NetworkDoesEntityExistWithNetworkId(data.vanNetId) and NetworkDoesEntityExistWithNetworkId(data.leaderNetId) then
+                    van = NetworkGetEntityFromNetworkId(data.vanNetId)
+                    leader = NetworkGetEntityFromNetworkId(data.leaderNetId)
                 end
             end
+            
+            if DoesEntityExist(van) and DoesEntityExist(leader) then
+                leaderDriver = GetPedInVehicleSeat(leader, -1)
+                if DoesEntityExist(leaderDriver) then
+                    break
+                end
+            end
+            
+            Wait(100)
+            timeout = timeout + 1
         end
-    end
 
-    -- 4. Speed Lock Thread
-    CreateThread(function()
-        while ConvoyActive and ConvoyState ~= "DEFENSIVE" do
-            local leaderSpeed = GetEntitySpeed(leader)
-            if leaderSpeed > 0.1 then
-                for _, escortId in ipairs(data.escortNetIds) do
-                    local v = NetworkGetEntityFromNetworkId(escortId)
-                    if DoesEntityExist(v) and v ~= leader then
-                        if GetEntitySpeed(v) > leaderSpeed + 1.2 then
-                            SetVehicleForwardSpeed(v, leaderSpeed)
-                        end
+        if not DoesEntityExist(van) or not DoesEntityExist(leader) or not DoesEntityExist(leaderDriver) then
+            print("^1[CONVOY ERROR]^7 Sync failed: Entities or Driver not networked in time.")
+            return 
+        end
+
+        Wait(500) -- Allow a moment for net-sync to settle fully
+
+        -- Ownership Check: Only one client should task the AI to prevent conflicts
+        if not NetworkHasControlOfEntity(leader) then 
+            return 
+        end
+
+        ConvoyActive = true
+        ConvoyState = data.state -- Ensure state is synced
+        
+        -- Simple Clean Motorcade Logic
+        local style = data.style or 786603
+        local speed = data.speed or 35.0
+
+        -- Leader drives to destination
+        TaskVehicleDriveToCoordLongrange(
+            leaderDriver,
+            leader,
+            data.dest.x,
+            data.dest.y,
+            data.dest.z,
+            speed,
+            style,
+            20.0
+        )
+
+        SetVehicleSiren(leader, true)
+
+        -- Everyone else escorts leader
+        for _, escortNetId in ipairs(data.escortNetIds) do
+            if NetworkDoesEntityExistWithNetworkId(escortNetId) then
+                local escort = NetworkGetEntityFromNetworkId(escortNetId)
+                if DoesEntityExist(escort) and escort ~= leader then
+                    local escortDriver = GetPedInVehicleSeat(escort, -1)
+                    if escortDriver and DoesEntityExist(escortDriver) then
+
+                        SetVehicleSiren(escort, true)
+                        SetEntityAsMissionEntity(escort, true, true)
+
+                        TaskVehicleEscort(
+                            escortDriver,
+                            escort,
+                            leader,
+                            -1,
+                            speed,
+                            style,
+                            7.5,
+                            15,
+                            25.0
+                        )
                     end
                 end
             end
-            Wait(200)
         end
-    end)
-    
-    print("^2[CONVOY]^7 Synchronized Elite AI tasks (State: " .. data.state .. ")")
+
+        print("^2[CONVOY]^7 Clean motorcade tasks applied (State: " .. data.state .. ")")
+    end) -- End of CreateThread
 end)
 
 -- Interaction / Looting Logic

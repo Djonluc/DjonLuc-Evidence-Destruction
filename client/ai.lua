@@ -19,7 +19,9 @@ end)
 
 -- State is synced globally in main.lua handler
 
-RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, seat, accuracy)
+RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, seat, accuracy, armor, weapon)
+    if not pedNetId or pedNetId == 0 then return end
+    
     local timeout = 0
     while not NetworkDoesEntityExistWithNetworkId(pedNetId) and timeout < 100 do
         Wait(10)
@@ -31,6 +33,8 @@ RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, se
         if DoesEntityExist(ped) then
             SetPedRelationshipGroupHash(ped, ConvoyGroupHash)
             SetPedAccuracy(ped, accuracy or 60)
+            if armor then SetPedArmour(ped, armor) end
+            if weapon then GiveWeaponToPed(ped, joaat(weapon), 500, false, true) end
             
             -- Hard Aggression: Never surrender, Never flee
             SetBlockingOfNonTemporaryEvents(ped, true)
@@ -51,10 +55,11 @@ RegisterNetEvent("djonluc:client:setGuardGroup", function(pedNetId, vehNetId, se
             SetPedCombatRange(ped, Config.AI.CombatRange or 2)
             SetPedAsCop(ped, true)
             SetEntityAsMissionEntity(ped, true, true)
+            SetEntityPersistence(ped, true)
             SetPedCanBeTargetted(ped, true) -- Correct native for targeting
             
             SetNetworkIdExistsOnAllMachines(pedNetId, true)
-            SetNetworkIdCanMigrate(pedNetId, false)
+            SetNetworkIdCanMigrate(pedNetId, true)
             
             -- Handle seating on client
             if vehNetId then
@@ -78,16 +83,16 @@ CreateThread(function()
         Wait(500)
         if not ConvoyActive then goto skip_dmg end
 
-        local convoyEntities = { ConvoyActiveNetId } -- Start with Van
-        -- Add guards and escorts to check list if needed, 
-        -- but usually van/escort collision is enough.
+        local van = nil
+        if ConvoyActiveNetId and NetworkDoesEntityExistWithNetworkId(ConvoyActiveNetId) then
+            van = NetworkGetEntityFromNetworkId(ConvoyActiveNetId)
+        end
 
-        -- Check Van & Escorts for damage/impacts
-        local entitiesToCheck = { NetworkGetEntityFromNetworkId(ConvoyActiveNetId) }
-        -- Add guards later in the loop or separate
+        local entitiesToCheck = {}
+        if van then table.insert(entitiesToCheck, van) end
 
         for _, entity in ipairs(GetGamePool("CVehicle")) do
-            local isConvoyVeh = (entity == NetworkGetEntityFromNetworkId(ConvoyActiveNetId))
+            local isConvoyVeh = (entity == van)
             if not isConvoyVeh then
                 for _, escort in ipairs(GetGamePool("CVehicle")) do
                     -- We can't easily identify escorts here without more netId syncing, 
@@ -96,13 +101,14 @@ CreateThread(function()
             end
 
             if isConvoyVeh then
-                -- 1. Damage check
+                -- 1. Damage check: Trigger ALERT based on damage, but identification is harder for vehicles
                 if HasEntityBeenDamagedByAnyPed(entity) then
-                    local attacker = GetEntityLastDamageEntity(entity)
-                    if IsPedAPlayer(attacker) then
-                        TriggerServerEvent("djonluc:server:markHostile", GetPlayerServerId(NetworkGetPlayerIndexFromPed(attacker)))
+                    -- If we can't reliably get the attacker for a vehicle, 
+                    -- the server-side health monitoring will still trigger ALERT.
+                    -- We just clear the flag to keep monitoring.
+                    if ClearEntityLastDamageEntity then
+                        ClearEntityLastDamageEntity(entity)
                     end
-                    ClearEntityLastDamageEntity(entity)
                 end
 
                 -- 2. Ram Detection (Collision check)
@@ -116,15 +122,20 @@ CreateThread(function()
             end
         end
 
-        -- Check Guards for damage
+        -- Check Guards for damage (Identify attackers)
         for _, ped in ipairs(GetGamePool("CPed")) do
             if GetPedRelationshipGroupHash(ped) == ConvoyGroupHash then
                 if HasEntityBeenDamagedByAnyPed(ped) then
-                    local attacker = GetEntityLastDamageEntity(ped)
+                    local attacker = GetPedSourceOfDamage(ped)
                     if IsPedAPlayer(attacker) then
-                        TriggerServerEvent("djonluc:server:markHostile", GetPlayerServerId(NetworkGetPlayerIndexFromPed(attacker)))
+                        local playerId = NetworkGetPlayerIndexFromPed(attacker)
+                        if playerId and playerId ~= -1 then
+                            TriggerServerEvent("djonluc:server:markHostile", GetPlayerServerId(playerId))
+                        end
                     end
-                    ClearEntityLastDamageEntity(ped)
+                    if ClearEntityLastDamageEntity then
+                        ClearEntityLastDamageEntity(ped)
+                    end
                 end
             end
         end
@@ -172,7 +183,9 @@ CreateThread(function()
                 else
                     if IsPedArmed(guard, 7) then
                         SetCurrentPedWeapon(guard, joaat("WEAPON_UNARMED"), true)
-                        ClearPedTasks(guard)
+                        if not IsPedInAnyVehicle(guard, false) then
+                            ClearPedTasks(guard)
+                        end
                     end
                 end
 
@@ -188,9 +201,17 @@ CreateThread(function()
                             if dist < 120.0 then
                                 hasTarget = true
                                 if IsPedInAnyVehicle(guard, false) then
-                                    -- Logic: Exit if attacked or hostile is close
-                                    if escalationTriggered or dist < 60.0 then
-                                        TaskLeaveVehicle(guard, GetVehiclePedIsIn(guard, false), 256)
+                                    local vehicle = GetVehiclePedIsIn(guard, false)
+                                    -- DO NOT let drivers exit
+                                    if GetPedInVehicleSeat(vehicle, -1) ~= guard then
+                                        if Config.AI.ExitOnAttack then
+                                            local shouldStop = math.random(1, 100) <= 40 -- 40% of guards stop
+                                            if shouldStop then
+                                                if escalationTriggered or dist < 60.0 then
+                                                    TaskLeaveVehicle(guard, vehicle, 256)
+                                                end
+                                            end
+                                        end
                                     end
                                 else
                                     TaskCombatPed(guard, targetPed, 0, 16)
@@ -213,3 +234,39 @@ end)
 
 
 -- Remove legacy relationship group force logic (It competes with the reactive system)
+
+-- BIKE RECOVERY SYSTEM
+CreateThread(function()
+    while true do
+        Wait(2000)
+
+        if not ConvoyActive then goto skip end
+
+        for _, ped in ipairs(GetGamePool("CPed")) do
+            if GetPedRelationshipGroupHash(ped) == ConvoyGroupHash then
+                if not IsPedInAnyVehicle(ped, false) then
+                    -- Find closest convoy bike
+                    local closestVeh = nil
+                    local closestDist = 999.0
+                    local pedCoords = GetEntityCoords(ped)
+
+                    for _, veh in ipairs(GetGamePool("CVehicle")) do
+                        if GetVehicleClass(veh) == 8 then -- Bikes only
+                            local dist = #(pedCoords - GetEntityCoords(veh))
+                            if dist < closestDist then
+                                closestDist = dist
+                                closestVeh = veh
+                            end
+                        end
+                    end
+
+                    if closestVeh and closestDist < 15.0 then
+                        TaskEnterVehicle(ped, closestVeh, 5000, -1, 2.0, 1, 0)
+                    end
+                end
+            end
+        end
+
+        ::skip::
+    end
+end)

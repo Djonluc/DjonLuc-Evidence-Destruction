@@ -47,15 +47,17 @@ function SyncConvoyTasks()
     
     local vanNetId = NetworkGetNetworkIdFromEntity(Convoy.van)
     local escortNetIds = {}
-    local leaderNetId = vanNetId -- Default to van
     
-    -- If we have escorts, the first one (Bikes or Patrol) should lead the physical movement
-    if #Convoy.escorts > 0 then
-        leaderNetId = NetworkGetNetworkIdFromEntity(Convoy.escorts[1])
-    end
-
+    -- The van is always the route leader
+    local leaderNetId = vanNetId
+    
     for _, escort in ipairs(Convoy.escorts) do
         table.insert(escortNetIds, NetworkGetNetworkIdFromEntity(escort))
+    end
+
+    -- Add the van to the sync list if it isn't the leader
+    if leaderNetId ~= vanNetId then
+        table.insert(escortNetIds, vanNetId)
     end
 
     TriggerClientEvent("djonluc:client:syncConvoyTasks", -1, {
@@ -193,6 +195,7 @@ RegisterCommand("convoystart", function(source)
         DebugLog("INFO", "Spawning convoy entities...")
         if SpawnFullConvoy() then
             Convoy.active = true
+            Convoy.controller = src
             Convoy.startedAt = os.time()
             Convoy.health = Config.Formation.Van.health
             Convoy.destroyed = false

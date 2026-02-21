@@ -42,13 +42,26 @@ function SpawnPedInVehicle(vehicle, pedData, seat)
         return nil
     end
 
-    local pedNetId = NetworkGetNetworkIdFromEntity(ped)
+    if vehicle and seat then
+        SetPedIntoVehicle(ped, vehicle, seat)
+    end
+
+    local pedNetId = 0
+    local timeout = 0
+    while pedNetId == 0 and timeout < 100 do
+        pedNetId = NetworkGetNetworkIdFromEntity(ped)
+        if pedNetId == 0 then Wait(10) end
+        timeout = timeout + 1
+    end
+
+    if pedNetId == 0 then
+        print("^1[CONVOY ERROR]^7 Failed to get netId for ped:", pedData.model)
+        return nil
+    end
+
     local vehNetId = NetworkGetNetworkIdFromEntity(vehicle)
     
-    TriggerClientEvent("djonluc:client:setGuardGroup", -1, pedNetId, vehNetId, seat or -1, pedData.accuracy)
-
-    SetPedArmour(ped, pedData.armor)
-    GiveWeaponToPed(ped, joaat(pedData.weapon), 500, false, true)
+    TriggerClientEvent("djonluc:client:setGuardGroup", -1, pedNetId, vehNetId, seat or -1, pedData.accuracy, pedData.armor, pedData.weapon)
 
     print("^2[CONVOY]^7 Spawned ped:", pedData.model)
     return ped
@@ -74,12 +87,26 @@ function SpawnConfiguredVehicle(config, coords)
         return nil
     end
 
-    if config.locked ~= false then -- Default to locked
+    if config.locked ~= false then
         SetVehicleDoorsLocked(vehicle, 2)
     end
 
-    local netId = NetworkGetNetworkIdFromEntity(vehicle)
-    
+    local netId = 0
+    timeout = 0
+    while netId == 0 and timeout < 100 do
+        netId = NetworkGetNetworkIdFromEntity(vehicle)
+        Wait(10)
+        timeout = timeout + 1
+    end
+
+    if netId == 0 then
+        print("^1[CONVOY ERROR]^7 Failed to get netId for vehicle:", config.model)
+        return nil
+    end
+
+    -- NOW stabilize AFTER netId is valid
+    TriggerClientEvent("djonluc:client:stabilizeVehicle", -1, netId)
+
     print("^2[CONVOY]^7 Spawned vehicle:", config.model)
     return vehicle
 end
