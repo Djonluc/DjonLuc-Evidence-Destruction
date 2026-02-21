@@ -17,7 +17,7 @@ Config.Route = {
     -- Driving Style: 
     -- 786603 (Default: Rushed, avoids traffic but stops at lights)
     -- 1074528293 (Aggressive SWAT: IGNORES traffic, stops for nothing)
-    DrivingStyle = 1074528293 
+    DrivingStyle = 786603 
 }
 
 ---------------------------------------------------------------------

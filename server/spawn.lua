@@ -115,21 +115,35 @@ function SpawnFullConvoy()
     local start = Config.Route.Start
     local formation = Config.Formation
 
-    -- 1. Lead Bikes (The very front of the convoy)
-    -- Spawned side-by-side exactly at the 'Start' point
+    --------------------------------------------------
+    -- 1️⃣ FRONT: ARMORED RIOT VAN (LEADER)
+    --------------------------------------------------
+    Convoy.van = SpawnConfiguredVehicle(formation.Van, start)
+    if not Convoy.van then return false end
+
+    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Driver, -1))
+    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Guard, 0))
+
+    --------------------------------------------------
+    -- 2️⃣ BIKES (Behind Van, Side-by-Side)
+    --------------------------------------------------
     for i, bikeData in ipairs(formation.Bikes) do
-        local side = (i == 1) and -2.0 or 2.0
-        local bikePos = GetBehindPosition(start, 0.0, side)
+        local side = (i == 1) and -2.5 or 2.5
+        local bikePos = GetBehindPosition(start, -8.0, side)
         local bike = SpawnConfiguredVehicle(bikeData, bikePos)
+
         if bike then
             table.insert(Convoy.escorts, bike)
             table.insert(Convoy.guards, SpawnPedInVehicle(bike, Config.Peds.Driver, -1))
         end
     end
 
-    -- 2. Patrol Car (8m behind bikes)
-    local patrolPos = GetBehindPosition(start, -8.0, 0.0)
+    --------------------------------------------------
+    -- 3️⃣ PATROL CAR (16m behind)
+    --------------------------------------------------
+    local patrolPos = GetBehindPosition(start, -16.0, 0.0)
     local patrol = SpawnConfiguredVehicle(formation.Patrol, patrolPos)
+
     if patrol then
         table.insert(Convoy.escorts, patrol)
         for s = -1, (formation.Patrol.seats or 2) - 2 do
@@ -137,9 +151,12 @@ function SpawnFullConvoy()
         end
     end
 
-    -- 3. Middle SUV (8m behind patrol car, 16m from start)
-    local suvPos = GetBehindPosition(start, -16.0, 0.0)
+    --------------------------------------------------
+    -- 4️⃣ SUV (24m behind)
+    --------------------------------------------------
+    local suvPos = GetBehindPosition(start, -24.0, 0.0)
     local suv = SpawnConfiguredVehicle(formation.SUV, suvPos)
+
     if suv then
         table.insert(Convoy.escorts, suv)
         for s = -1, (formation.SUV.seats or 4) - 2 do
@@ -147,25 +164,18 @@ function SpawnFullConvoy()
         end
     end
 
-    -- 4. Van (10m behind SUV, 26m from start)
-    local vanPos = GetBehindPosition(start, -26.0, 0.0)
-    Convoy.van = SpawnConfiguredVehicle(formation.Van, vanPos)
-    if Convoy.van then
-        table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Driver, -1))
-        table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Guard, 0))
-    else
-        return false
-    end
-
-    -- 5. Rear Escort (10m behind Van, 36m from start)
-    local rearPos = GetBehindPosition(start, -36.0, 0.0)
+    --------------------------------------------------
+    -- 5️⃣ REAR ESCORT (32m behind)
+    --------------------------------------------------
+    local rearPos = GetBehindPosition(start, -32.0, 0.0)
     local rear = SpawnConfiguredVehicle(formation.Rear, rearPos)
+
     if rear then
         table.insert(Convoy.escorts, rear)
         for s = -1, (formation.Rear.seats or 4) - 2 do
             table.insert(Convoy.guards, SpawnPedInVehicle(rear, Config.Peds.Guard, s))
         end
     end
-    
+
     return true
 end

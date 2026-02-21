@@ -74,6 +74,8 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
 
         NetworkRequestControlOfEntity(leader)
 
+        NetworkRequestControlOfEntity(leader)
+
         ConvoyActive = true
         ConvoyState = data.state -- Ensure state is synced
         
@@ -130,12 +132,12 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
                             escortDriver,
                             escort,
                             leader,
-                            -1,
-                            speed,
-                            style,
-                            7.5,
-                            15,
-                            25.0
+                            1,              -- formation mode (stay behind, not side)
+                            speed - 3.0,    -- slightly slower than van
+                            786603,         -- safer driving style for escorts
+                            10.0,           -- spacing
+                            20,
+                            35.0
                         )
                     end
                 end

@@ -83,6 +83,23 @@ CreateThread(function()
         Wait(500)
         if not ConvoyActive then goto skip_dmg end
 
+        -- Proximity Threat Scan
+        for _, player in ipairs(GetActivePlayers()) do
+            local targetPed = GetPlayerPed(player)
+            local serverId = GetPlayerServerId(player)
+
+            if not LocalLawPlayers[serverId] then
+                if IsPedShooting(targetPed) then
+                    -- Get any guard to check distance from
+                    local localPed = PlayerPedId() 
+                    local dist = #(GetEntityCoords(localPed) - GetEntityCoords(targetPed))
+                    if dist < 80.0 then
+                        TriggerServerEvent("djonluc:server:markHostile", serverId)
+                    end
+                end
+            end
+        end
+
         local van = nil
         if ConvoyActiveNetId and NetworkDoesEntityExistWithNetworkId(ConvoyActiveNetId) then
             van = NetworkGetEntityFromNetworkId(ConvoyActiveNetId)

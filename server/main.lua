@@ -138,6 +138,17 @@ CreateThread(function()
     end
 end)
 
+-- Repeating Blip Sync Thread
+CreateThread(function()
+    while true do
+        Wait(5000)
+
+        if Convoy.active and Convoy.van and DoesEntityExist(Convoy.van) then
+            TriggerClientEvent("djonluc:client:startBlips", -1, NetworkGetNetworkIdFromEntity(Convoy.van))
+        end
+    end
+end)
+
 
 -- Success and Timeout check
 CreateThread(function()
