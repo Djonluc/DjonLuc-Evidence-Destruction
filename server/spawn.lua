@@ -50,7 +50,6 @@ function SafeSpawnVehicle(modelNames, coords)
         return nil
     end
 
-    SetVehicleOnGroundProperly(spawnedVeh)
     SetEntityAsMissionEntity(spawnedVeh, true, true)
 
     local netId = NetworkGetNetworkIdFromEntity(spawnedVeh)

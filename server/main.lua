@@ -30,6 +30,7 @@ function CheckClientNatives()
 end
 
 local cooldownActive = false
+LawPlayers = {} -- For job-based protection
 HostileList = {} -- Global for cleanup visibility
 
 -- Helper to start cooldown
