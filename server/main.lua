@@ -207,6 +207,22 @@ RegisterCommand("convoystart", function(source)
         end
 
         DebugLog("INFO", "Spawning convoy entities...")
+        
+        -- PRE-STREAMING: Ensure models are ready on the client before server spawns
+        local preloadModels = {
+            Config.Formation.Van.model,
+            Config.Formation.Patrol.model,
+            Config.Formation.SUV.model,
+            Config.Formation.Rear.model,
+            Config.Peds.Driver.model,
+            Config.Peds.Guard.model,
+            "stockade", "police4", "policeb2", "police2", "fbi2", "granger" -- Fallbacks
+        }
+        for _, b in ipairs(Config.Formation.Bikes) do table.insert(preloadModels, b.model) end
+        
+        TriggerClientEvent("djonluc:client:preloadFormation", src, preloadModels)
+        Wait(2000) -- Give client time to stream
+
         if SpawnFullConvoy() then
             Convoy.active = true
             Convoy.controller = src

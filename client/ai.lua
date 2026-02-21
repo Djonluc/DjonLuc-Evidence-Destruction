@@ -171,3 +171,24 @@ CreateThread(function()
         end
     end
 end)
+
+-- 6️⃣ PRE-STREAMING HANDLER (Ensures models are ready for server-side spawn)
+RegisterNetEvent("djonluc:client:preloadFormation", function(models)
+    print("^3[CONVOY]^7 Preloading models for spawn...")
+    for _, model in ipairs(models) do
+        local hash = joaat(model)
+        if IsModelInCdimage(hash) then
+            RequestModel(hash)
+            local timeout = 0
+            while not HasModelLoaded(hash) and timeout < 100 do
+                Wait(10)
+                timeout = timeout + 1
+            end
+            if HasModelLoaded(hash) then
+                print("^2[CONVOY]^7 Model pre-streamed: " .. model)
+            else
+                print("^1[CONVOY ERROR]^7 Model pre-streaming failed: " .. model)
+            end
+        end
+    end
+end)
