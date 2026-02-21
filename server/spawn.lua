@@ -2,7 +2,7 @@
 
 Convoy = {
     active = false,
-    state = "CALM", -- CALM, ALERT, DEFENSIVE
+    state = "CALM",
     van = nil,
     escorts = {},
     guards = {},
@@ -13,32 +13,39 @@ Convoy = {
     lastEvent = 0
 }
 
-LawPlayers = {}
-
 local function GetBehindPosition(base, distForward, distSide)
     local rad = math.rad(base.w)
     local fx = math.sin(rad)
     local fy = math.cos(rad)
-    
     local x = base.x + (fx * distForward) + (fy * distSide)
     local y = base.y + (fy * distForward) - (fx * distSide)
     return vector4(x, y, base.z, base.w)
 end
 
 function SpawnPedInVehicle(vehicle, pedData, seat)
-    local hash = joaat(pedData.model)
-
+    local modelName = pedData.model
+    local hash = joaat(modelName)
     local coords = GetEntityCoords(vehicle)
-    local ped = CreatePed(28, hash, coords.x, coords.y, coords.z, 0.0, true, true)
+    
+    -- Debugging spawn
+    if Config.Debug.Enabled then
+        print(string.format("^3[CONVOY DEBUG]^7 Spawning ped %s for seat %d", modelName, seat or -1))
+    end
+
+    -- Server-side CreatePed (Using model string directly)
+    local ped = CreatePed(28, modelName, coords.x, coords.y, coords.z + 0.5, 0.0, true, true)
+    
+    -- Wait a frame
+    Wait(50)
 
     if not DoesEntityExist(ped) then
-        print("^1[CONVOY ERROR]^7 Ped failed to spawn:", pedData.model)
+        print("^1[CONVOY ERROR]^7 Failed to spawn ped:", modelName, "Hash:", hash)
         return nil
     end
 
     SetPedIntoVehicle(ped, vehicle, seat or -1)
-
-    -- Server Authoritative Basics
+    
+    -- Server-Authoritative Basics
     GiveWeaponToPed(ped, joaat(pedData.weapon), 500, false, true)
     SetPedDropsWeaponsWhenDead(ped, false)
     SetEntityAsMissionEntity(ped, true, true)
@@ -46,29 +53,36 @@ function SpawnPedInVehicle(vehicle, pedData, seat)
     local pedNetId = NetworkGetNetworkIdFromEntity(ped)
     local vehNetId = NetworkGetNetworkIdFromEntity(vehicle)
     
+    -- Delegate all tactical attributes to Client
     TriggerClientEvent("djonluc:client:setGuardGroup", -1, pedNetId, vehNetId, seat or -1, pedData.accuracy, pedData.armor, pedData.weapon)
 
-    print("^2[CONVOY]^7 Spawned ped:", pedData.model)
+    table.insert(Convoy.guards, ped)
     return ped
 end
 
 function SpawnConfiguredVehicle(config, coords)
     if not coords then
-        print("^1[CONVOY ERROR]^7 Missing spawn coordinates.")
+        print("^1[CONVOY ERROR]^7 Missing spawn coords.")
         return nil
     end
 
-    local hash = joaat(config.model)
-    local vehicle = CreateVehicle(hash, coords.x, coords.y, coords.z, coords.w, true, true)
-
-    local timeout = 0
-    while not DoesEntityExist(vehicle) and timeout < 100 do
-        Wait(10)
-        timeout = timeout + 1
+    local modelName = config.model
+    local hash = joaat(modelName)
+    
+    -- Debugging spawn
+    if Config.Debug.Enabled then
+        print(string.format("^3[CONVOY DEBUG]^7 Spawning %s at %.2f, %.2f, %.2f (Heading: %.2f)", modelName, coords.x, coords.y, coords.z, coords.w))
     end
 
+    -- Server-side CreateVehicle (Trying string model name for better compatibility)
+    -- Adding +1.0 to Z to avoid floor clipping
+    local vehicle = CreateVehicle(modelName, coords.x, coords.y, coords.z + 1.0, coords.w, true, false)
+    
+    -- Wait a frame for server entity ID to register
+    Wait(100)
+
     if not DoesEntityExist(vehicle) then
-        print("^1[CONVOY ERROR]^7 Failed to create vehicle:", config.model)
+        print("^1[CONVOY ERROR]^7 Failed to spawn vehicle:", modelName, "Hash:", hash)
         return nil
     end
 
@@ -76,50 +90,37 @@ function SpawnConfiguredVehicle(config, coords)
         SetVehicleDoorsLocked(vehicle, 2)
     end
 
-    local netId = 0
-    timeout = 0
-    while netId == 0 and timeout < 100 do
-        netId = NetworkGetNetworkIdFromEntity(vehicle)
-        Wait(10)
-        timeout = timeout + 1
-    end
+    SetEntityAsMissionEntity(vehicle, true, true)
 
-    if netId == 0 then
-        print("^1[CONVOY ERROR]^7 Failed to get netId for vehicle:", config.model)
-        return nil
-    end
-
-    -- NOW stabilize AFTER netId is valid
+    local netId = NetworkGetNetworkIdFromEntity(vehicle)
     TriggerClientEvent("djonluc:client:stabilizeVehicle", -1, netId)
+    table.insert(Convoy.escorts, vehicle)
 
-    print("^2[CONVOY]^7 Spawned vehicle:", config.model)
     return vehicle
 end
 
 function SpawnFullConvoy()
     local start = Config.Route.Start
-    local formation = Config.Formation
+    local form = Config.Formation
 
     --------------------------------------------------
     -- 1️⃣ FRONT: ARMORED RIOT VAN (LEADER)
     --------------------------------------------------
-    Convoy.van = SpawnConfiguredVehicle(formation.Van, start)
+    Convoy.van = SpawnConfiguredVehicle(form.Van, start)
     if not Convoy.van then return false end
 
-    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Driver, -1))
-    table.insert(Convoy.guards, SpawnPedInVehicle(Convoy.van, Config.Peds.Guard, 0))
+    SpawnPedInVehicle(Convoy.van, Config.Peds.Driver, -1)
+    SpawnPedInVehicle(Convoy.van, Config.Peds.Guard, 0)
 
     --------------------------------------------------
     -- 2️⃣ BIKES (Behind Van, Side-by-Side)
     --------------------------------------------------
-    for i, bikeData in ipairs(formation.Bikes) do
+    for i, bikeData in ipairs(form.Bikes) do
         local side = (i == 1) and -2.5 or 2.5
-        local bikePos = GetBehindPosition(start, -8.0, side)
-        local bike = SpawnConfiguredVehicle(bikeData, bikePos)
-
+        local pos = GetBehindPosition(start, -8.0, side)
+        local bike = SpawnConfiguredVehicle(bikeData, pos)
         if bike then
-            table.insert(Convoy.escorts, bike)
-            table.insert(Convoy.guards, SpawnPedInVehicle(bike, Config.Peds.Driver, -1))
+            SpawnPedInVehicle(bike, Config.Peds.Driver, -1)
         end
     end
 
@@ -127,25 +128,21 @@ function SpawnFullConvoy()
     -- 3️⃣ PATROL CAR (16m behind)
     --------------------------------------------------
     local patrolPos = GetBehindPosition(start, -16.0, 0.0)
-    local patrol = SpawnConfiguredVehicle(formation.Patrol, patrolPos)
-
+    local patrol = SpawnConfiguredVehicle(form.Patrol, patrolPos)
     if patrol then
-        table.insert(Convoy.escorts, patrol)
-        for s = -1, (formation.Patrol.seats or 2) - 2 do
-            table.insert(Convoy.guards, SpawnPedInVehicle(patrol, Config.Peds.Guard, s))
-        end
+        SpawnPedInVehicle(patrol, Config.Peds.Guard, 0)
+        SpawnPedInVehicle(patrol, Config.Peds.Guard, 1)
     end
 
     --------------------------------------------------
     -- 4️⃣ SUV (24m behind)
     --------------------------------------------------
     local suvPos = GetBehindPosition(start, -24.0, 0.0)
-    local suv = SpawnConfiguredVehicle(formation.SUV, suvPos)
-
+    local suv = SpawnConfiguredVehicle(form.SUV, suvPos)
     if suv then
-        table.insert(Convoy.escorts, suv)
-        for s = -1, (formation.SUV.seats or 4) - 2 do
-            table.insert(Convoy.guards, SpawnPedInVehicle(suv, Config.Peds.Guard, s))
+        -- Fill seats up to model capacity
+        for s = 0, (form.SUV.seats or 4) - 2 do
+            SpawnPedInVehicle(suv, Config.Peds.Guard, s)
         end
     end
 
@@ -153,12 +150,10 @@ function SpawnFullConvoy()
     -- 5️⃣ REAR ESCORT (32m behind)
     --------------------------------------------------
     local rearPos = GetBehindPosition(start, -32.0, 0.0)
-    local rear = SpawnConfiguredVehicle(formation.Rear, rearPos)
-
+    local rear = SpawnConfiguredVehicle(form.Rear, rearPos)
     if rear then
-        table.insert(Convoy.escorts, rear)
-        for s = -1, (formation.Rear.seats or 4) - 2 do
-            table.insert(Convoy.guards, SpawnPedInVehicle(rear, Config.Peds.Guard, s))
+        for r = 0, (form.Rear.seats or 4) - 2 do
+            SpawnPedInVehicle(rear, Config.Peds.Guard, r)
         end
     end
 
