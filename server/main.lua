@@ -113,6 +113,9 @@ CreateThread(function()
                         Framework.Notify(-1, "The evidence convoy is on high alert!", "error")
                     elseif Convoy.state == "DEFENSIVE" then
                         Framework.Notify(-1, "The evidence convoy has engaged maximum defensive protocols!", "error")
+                        if Config.Event.EnableBackup then
+                            SpawnBackupUnits()
+                        end
                     end
                 end
 
@@ -222,6 +225,35 @@ RegisterCommand("convoystart", function(source)
         ErrorLog("CRITICAL ERROR during convoystart: " .. tostring(err))
     end
 end)
+
+function SpawnBackupUnits()
+    if not Convoy.van or not DoesEntityExist(Convoy.van) then return end
+    
+    local vanCoords = GetEntityCoords(Convoy.van)
+    local backupPos = vector4(
+        vanCoords.x + math.random(-30, 30),
+        vanCoords.y + math.random(-30, 30),
+        vanCoords.z,
+        0.0
+    )
+
+    local backupVeh = SpawnConfiguredVehicle({
+        model = "fbi2",
+        seats = 4,
+        locked = false
+    }, backupPos)
+
+    if backupVeh then
+        table.insert(Convoy.escorts, backupVeh)
+        for i = -1, 2 do
+            table.insert(Convoy.guards,
+                SpawnPedInVehicle(backupVeh, Config.Peds.Guard, i)
+            )
+        end
+        SyncConvoyTasks() -- Re-sync so new units follow the van
+        DebugLog("ACTION", "Reinforcement units spawned.")
+    end
+end
 
 
 RegisterCommand("convoystop", function(source)

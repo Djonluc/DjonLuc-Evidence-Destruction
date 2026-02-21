@@ -68,10 +68,11 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
 
         Wait(500) -- Allow a moment for net-sync to settle fully
 
-        -- Ownership Check: Only one client should task the AI to prevent conflicts
         if not NetworkHasControlOfEntity(leader) then 
             return 
         end
+
+        NetworkRequestControlOfEntity(leader)
 
         ConvoyActive = true
         ConvoyState = data.state -- Ensure state is synced
@@ -92,6 +93,25 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
             20.0
         )
 
+        -- Fix 2: Speed Governor Thread
+        CreateThread(function()
+            while ConvoyActive do
+                Wait(500)
+
+                if NetworkDoesEntityExistWithNetworkId(data.vanNetId) then
+                    local vanEntity = NetworkGetEntityFromNetworkId(data.vanNetId)
+
+                    if DoesEntityExist(vanEntity) then
+                        local maxSpeed = (data.speed or 35.0) / 2.237 -- mph to m/s
+
+                        if GetEntitySpeed(vanEntity) > maxSpeed then
+                            SetVehicleForwardSpeed(vanEntity, maxSpeed)
+                        end
+                    end
+                end
+            end
+        end)
+
         SetVehicleSiren(leader, true)
 
         -- Everyone else escorts leader
@@ -102,6 +122,7 @@ RegisterNetEvent("djonluc:client:syncConvoyTasks", function(data)
                     local escortDriver = GetPedInVehicleSeat(escort, -1)
                     if escortDriver and DoesEntityExist(escortDriver) then
 
+                        NetworkRequestControlOfEntity(escort)
                         SetVehicleSiren(escort, true)
                         SetEntityAsMissionEntity(escort, true, true)
 
